@@ -9,16 +9,14 @@ export async function GET(request: Request) {
     const email = searchParams.get("email");
 
     if (!email) {
-      return NextResponse.json(
-        { error: "Missing email" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing email" }, { status: 400 });
     }
 
     const vendor = await prisma.vendor.findUnique({ where: { email } });
 
     return NextResponse.json({ exists: !!vendor, vendor: vendor ?? null });
   } catch (error) {
+    console.error("Failed to fetch vendor status:", error);
     return NextResponse.json(
       { error: "Failed to fetch vendor status" },
       { status: 500 }
@@ -54,20 +52,36 @@ export async function POST(request: Request) {
     }
 
     // Ensure a store exists/created for this vendor
-    let store = await prisma.store.findUnique({ where: { vendorId: vendor.id } });
+    let store = await prisma.store.findUnique({
+      where: { vendorId: vendor.id },
+    });
     if (!store) {
-      store = await prisma.store.create({ data: { vendorId: vendor.id, name: storeName, address: address ?? null } });
+      store = await prisma.store.create({
+        data: {
+          vendorId: vendor.id,
+          name: storeName,
+          address: address ?? null,
+        },
+      });
     } else if (storeName || address) {
-      store = await prisma.store.update({ where: { id: store.id }, data: { name: storeName ?? store.name, address: address ?? store.address } });
+      store = await prisma.store.update({
+        where: { id: store.id },
+        data: {
+          name: storeName ?? store.name,
+          address: address ?? store.address,
+        },
+      });
     }
 
-    return NextResponse.json({ vendor, store }, { status: existing ? 200 : 201 });
-  } catch (_) {
+    return NextResponse.json(
+      { vendor, store },
+      { status: existing ? 200 : 201 }
+    );
+  } catch (error) {
+    console.error("Failed to create vendor:", error);
     return NextResponse.json(
       { error: "Failed to create vendor" },
       { status: 500 }
     );
   }
 }
-
-

@@ -54,8 +54,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ menu }, { status: 200 });
-  } catch (_) {
-    return NextResponse.json({ error: "Failed to create menu" }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to create menu" + error }, { status: 500 });
   }
 }
 

@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SignInButton } from "@/components/auth/SignInButton";
-import { Avatar } from "@/components/ui/avatar";
 import { useSession } from "@/lib/auth-client";
 import Image from "next/image";
 import {
