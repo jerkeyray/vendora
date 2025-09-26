@@ -57,14 +57,6 @@ export default function HomePage() {
             ease: "back.out(1.7)",
           }
         );
-
-        gsap.to(imageRef.current, {
-          y: -15,
-          duration: 3,
-          ease: "power2.inOut",
-          yoyo: true,
-          repeat: -1,
-        });
       }
 
       // Navbar animation
@@ -78,20 +70,6 @@ export default function HomePage() {
             trigger: featuresRef.current,
             start: "top 100px",
             toggleActions: "play none none reverse",
-          },
-        });
-      }
-
-      // Snap scrolling for panels
-      const panels = gsap.utils.toArray(".panel");
-      if (panels.length > 1) {
-        ScrollTrigger.create({
-          trigger: heroRef.current,
-          start: "top top",
-          snap: {
-            snapTo: 1 / (panels.length - 1),
-            duration: 0.4,
-            ease: "power2.inOut",
           },
         });
       }
@@ -135,7 +113,11 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background" ref={heroRef}>
+    <div
+      className="min-h-screen bg-background"
+      style={{ scrollSnapType: "none" }}
+      ref={heroRef}
+    >
       {/* Header */}
       <header
         ref={headerRef}
