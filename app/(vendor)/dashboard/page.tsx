@@ -147,34 +147,8 @@ export default function Dashboard() {
           </div>
         </div>
       </Dialog>
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between relative">
-          <h1 className="text-2xl font-bold">Vendora Dashboard</h1>
 
-          <nav className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-8">
-            <Link href="/dashboard" className="text-sm font-medium text-foreground/80 hover:text-foreground">Dashboard</Link>
-            <Link href="/menu" className="text-sm font-medium text-foreground/80 hover:text-foreground">Menu</Link>
-            <Link href="/orders" className="text-sm font-medium text-foreground/80 hover:text-foreground">Orders</Link>
-            <Link href="/analytics" className="text-sm font-medium text-foreground/80 hover:text-foreground">Analytics</Link>
-          </nav>
-
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
-              Welcome, {session.user.name}
-            </span>
-            <Link href="/profile" aria-label="Profile">
-              <Avatar
-                src={(session.user.image as string | null) || undefined}
-                alt={session.user.name as string}
-                fallback={(session.user.name as string) || (session.user.email as string)}
-                email={session.user.email as string}
-                size={36}
-              />
-            </Link>
-          </div>
-        </div>
-      </header>
+      {/* Header is provided by (vendor)/layout.tsx */}
 
       {/* Dashboard Content */}
       <section className="py-8">
@@ -276,3 +250,5 @@ export default function Dashboard() {
     </main>
   );
 }
+
+

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 
 export default function Profile() {
   const { data: session, isPending } = useSession();
@@ -32,18 +33,21 @@ export default function Profile() {
           <CardHeader>
             <CardTitle>Your Profile</CardTitle>
           </CardHeader>
-          <CardContent className="flex items-center gap-4">
-            <Avatar
-              src={(session.user.image as string | null) || undefined}
-              alt={session.user.name as string}
-              fallback={(session.user.name as string) || (session.user.email as string)}
-              email={session.user.email as string}
-              size={56}
-            />
-            <div>
-              <div className="text-base font-medium">{session.user.name}</div>
-              <div className="text-sm text-muted-foreground">{session.user.email}</div>
+          <CardContent className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Avatar
+                src={(session.user.image as string | null) || undefined}
+                alt={session.user.name as string}
+                fallback={(session.user.name as string) || (session.user.email as string)}
+                email={session.user.email as string}
+                size={56}
+              />
+              <div>
+                <div className="text-base font-medium">{session.user.name}</div>
+                <div className="text-sm text-muted-foreground">{session.user.email}</div>
+              </div>
             </div>
+            <SignOutButton />
           </CardContent>
         </Card>
       </div>
