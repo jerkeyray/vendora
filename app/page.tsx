@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useEffect, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
@@ -23,11 +23,53 @@ gsap.registerPlugin(ScrollTrigger);
 
 export default function Home() {
   const { data: session, isPending } = useSession();
+  const [onboardingStatus, setOnboardingStatus] = useState<
+    "loading" | "complete" | "needed"
+  >("loading");
   const heroRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
   const ctaRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
+
+  // Check onboarding status when user is authenticated
+  useEffect(() => {
+    if (!session?.user?.email) {
+      setOnboardingStatus("needed");
+      return;
+    }
+
+    const checkOnboardingStatus = async () => {
+      try {
+        const response = await fetch(
+          `/api/onboarding?email=${encodeURIComponent(session.user.email)}`
+        );
+        const data = await response.json();
+
+        if (data.onboardingComplete) {
+          setOnboardingStatus("complete");
+        } else {
+          setOnboardingStatus("needed");
+        }
+      } catch (error) {
+        console.error("Error checking onboarding status:", error);
+        setOnboardingStatus("needed");
+      }
+    };
+
+    checkOnboardingStatus();
+  }, [session?.user?.email]);
+
+  // Determine the correct redirect URL for authenticated users
+  const getDashboardUrl = () => {
+    if (onboardingStatus === "loading") {
+      return "#"; // Prevent navigation while loading
+    }
+    if (onboardingStatus === "complete") {
+      return "/dashboard";
+    }
+    return "/onboarding";
+  };
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
@@ -153,7 +195,7 @@ export default function Home() {
             {!isPending && (
               <div>
                 {session ? (
-                  <Link href="/dashboard">
+                  <Link href={getDashboardUrl()}>
                     <Button variant="outline" size="sm">
                       Dashboard
                     </Button>
@@ -188,7 +230,7 @@ export default function Home() {
                   <Spinner size="sm" variant="white" />
                 </Button>
               ) : session ? (
-                <Link href="/dashboard">
+                <Link href={getDashboardUrl()}>
                   <Button
                     size="lg"
                     className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8"
@@ -302,7 +344,7 @@ export default function Home() {
                   <Spinner size="sm" variant="white" />
                 </Button>
               ) : session ? (
-                <Link href="/dashboard">
+                <Link href={getDashboardUrl()}>
                   <Button
                     size="lg"
                     className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8"
