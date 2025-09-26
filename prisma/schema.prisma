@@ -1,10 +1,271 @@
+
 generator client {
   provider = "prisma-client-js"
   output   = "../lib/generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+}
+
+// Vendor Management
+
+model Vendor {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  phone     String?
+  name      String
+  upiId     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // Relations - One vendor has one store
+  store     Store?
+
+  @@map("vendors")
+}
+
+model Store {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  address     String?
+  qrCode      String? // Generated QR code for the store
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  // Foreign Keys - One-to-one with vendor
+  vendorId    String       @unique
+  // Relations
+  vendor      Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  menus       Menu[]
+  orders      Order[]
+  dailySales  DailySales[]
+  itemSales   ItemSales[]
+
+  @@map("stores")
+}
+
+// Menu Management
+
+model Menu {
+  id         String     @id @default(cuid())
+  name       String     @default("Main Menu")
+  isActive   Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  // Foreign Keys
+  storeId    String
+  // Relations
+  store      Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  categories Category[]
+  menuItems  MenuItem[]
+
+  @@map("menus")
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  // Foreign Keys
+  menuId      String
+  // Relations
+  menu        Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  menuItems   MenuItem[]
+
+  @@map("categories")
+}
+
+model MenuItem {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  price       Decimal     @db.Decimal(10, 2)
+  image       String?
+  isAvailable Boolean     @default(true)
+  isVeg       Boolean     @default(true)
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  // Foreign Keys
+  menuId      String
+  categoryId  String?
+  // Relations
+  menu        Menu        @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  category    Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  orderItems  OrderItem[]
+  itemSales   ItemSales[]
+
+  @@map("menu_items")
+}
+
+// Customer Management - No authentication required
+// We'll track minimal info only when customer provides it voluntarily
+
+model Customer {
+  id        String   @id @default(cuid())
+  phone     String? // Optional, only if customer provides for order updates
+  name      String? // Optional, only if customer provides
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // Relations
+  orders    Order[]
+
+  @@map("customers")
+}
+
+// Order Management
+
+model Order {
+  id                 String      @id @default(cuid())
+  orderNumber        String      @unique // Human readable order number
+  status             OrderStatus @default(PENDING_PAYMENT)
+  totalAmount        Decimal     @db.Decimal(10, 2)
+  paymentMethod      String      @default("UPI")
+  notes              String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  // Timestamps for order flow
+  paymentCompletedAt DateTime?
+  confirmedAt        DateTime?
+  rejectedAt         DateTime?
+  completedAt        DateTime?
+  // Foreign Keys
+  storeId            String
+  customerId         String? // Optional - only if customer provides info
+  // Relations
+  store              Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer           Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  orderItems         OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  quantity   Int
+  price      Decimal  @db.Decimal(10, 2) // Price at time of order
+  notes      String?
+  createdAt  DateTime @default(now())
+  // Foreign Keys
+  orderId    String
+  menuItemId String
+  // Relations
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+// Analytics and Tracking
+
+model DailySales {
+  id           String   @id @default(cuid())
+  date         DateTime @db.Date
+  totalOrders  Int      @default(0)
+  totalRevenue Decimal  @db.Decimal(10, 2) @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  // Foreign Keys
+  storeId      String
+  // Relations
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, date])
+  @@map("daily_sales")
+}
+
+model ItemSales {
+  id         String   @id @default(cuid())
+  date       DateTime @db.Date
+  quantity   Int      @default(0)
+  revenue    Decimal  @db.Decimal(10, 2) @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  // Foreign Keys
+  storeId    String
+  menuItemId String
+  // Relations
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, menuItemId, date])
+  @@map("item_sales")
+}
+
+// Enums
+
+enum OrderStatus {
+  PENDING_PAYMENT // Customer hasn't completed payment yet
+  PAYMENT_COMPLETED // Customer clicked "payment complete" 
+  CONFIRMED // Vendor confirmed the order
+  REJECTED // Vendor rejected the order
+  COMPLETED // Order fulfilled
+  CANCELLED // Order cancelled
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@map("verification")
 }
