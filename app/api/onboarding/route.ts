@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@/lib/generated/prisma";
+import { generateStoreQRCode } from "@/lib/qr-generator";
+import { generateUniqueSlug } from "@/lib/slug-generator";
 
 const prisma = new PrismaClient();
 
@@ -58,13 +60,32 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Generate unique slug for the store
+      const existingSlugs = await tx.store
+        .findMany({
+          where: { slug: { not: null } },
+          select: { slug: true },
+        })
+        .then(
+          (stores) => stores.map((s) => s.slug).filter(Boolean) as string[]
+        );
+
+      const slug = generateUniqueSlug(store.name, existingSlugs);
+
+      // Generate QR code for the store
+      const baseURL =
+        process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+      const qrCode = await generateStoreQRCode(slug, baseURL);
+
       // Create store
       const newStore = await tx.store.create({
         data: {
           name: store.name,
+          slug: slug,
           description: store.description || null,
           address: store.address || null,
           vendorId: newVendor.id,
+          qrCode: qrCode,
         },
       });
 

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@/lib/generated/prisma";
+import { generateStoreQRCode } from "@/lib/qr-generator";
+import { generateUniqueSlug } from "@/lib/slug-generator";
 
 const prisma = new PrismaClient();
 
@@ -56,19 +58,87 @@ export async function POST(request: Request) {
       where: { vendorId: vendor.id },
     });
     if (!store) {
+      // Generate unique slug for the store
+      const existingSlugs = await prisma.store
+        .findMany({
+          where: { slug: { not: null } },
+          select: { slug: true },
+        })
+        .then(
+          (stores) => stores.map((s) => s.slug).filter(Boolean) as string[]
+        );
+
+      const slug = generateUniqueSlug(storeName, existingSlugs);
+
+      // Generate QR code for new store
+      const baseURL =
+        process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+      const qrCode = await generateStoreQRCode(slug, baseURL);
+
       store = await prisma.store.create({
         data: {
           vendorId: vendor.id,
           name: storeName,
+          slug: slug,
           address: address ?? null,
+          qrCode: qrCode,
         },
       });
     } else if (storeName || address) {
+      // If store name changed, regenerate slug and QR code
+      const shouldRegenerateSlug = storeName && storeName !== store.name;
+      let slug = store.slug;
+      let qrCode = store.qrCode;
+
+      if (shouldRegenerateSlug) {
+        // Generate new unique slug
+        const existingSlugs = await prisma.store
+          .findMany({
+            where: {
+              slug: { not: null },
+              id: { not: store.id }, // Exclude current store
+            },
+            select: { slug: true },
+          })
+          .then(
+            (stores) => stores.map((s) => s.slug).filter(Boolean) as string[]
+          );
+
+        slug = generateUniqueSlug(storeName, existingSlugs);
+
+        // Regenerate QR code with new slug
+        const baseURL =
+          process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+        qrCode = await generateStoreQRCode(slug, baseURL);
+      } else if (!store.slug) {
+        // Generate slug for existing store without one
+        const existingSlugs = await prisma.store
+          .findMany({
+            where: {
+              slug: { not: null },
+              id: { not: store.id },
+            },
+            select: { slug: true },
+          })
+          .then(
+            (stores) => stores.map((s) => s.slug).filter(Boolean) as string[]
+          );
+
+        slug = generateUniqueSlug(store.name, existingSlugs);
+
+        // Generate QR code with slug
+        const baseURL =
+          process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+        qrCode = await generateStoreQRCode(slug, baseURL);
+      }
+
       store = await prisma.store.update({
         where: { id: store.id },
         data: {
           name: storeName ?? store.name,
+          slug: slug,
           address: address ?? store.address,
+          qrCode: qrCode,
         },
       });
     }

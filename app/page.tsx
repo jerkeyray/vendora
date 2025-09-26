@@ -192,6 +192,12 @@ export default function Home() {
             >
               Contact
             </a>
+            <Link
+              href="/stores"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Browse Stores
+            </Link>
             {!isPending && (
               <div>
                 {session ? (

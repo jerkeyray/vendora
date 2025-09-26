@@ -6,9 +6,7 @@ import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import {
-  ShoppingBag,
   ChefHat,
-  Plus,
   QrCode,
   Edit,
   Download,
@@ -20,10 +18,11 @@ import { Spinner } from "@/components/ui/spinner";
 export default function Dashboard() {
   const { data: session, isPending } = useSession();
   const router = useRouter();
-  const [hasMenuItems, setHasMenuItems] = useState<boolean | null>(null);
-  const [isCheckingMenu, setIsCheckingMenu] = useState(true);
-  const [menuItemsCount, setMenuItemsCount] = useState(0);
+  const [isLoadingStore, setIsLoadingStore] = useState(true);
   const [storeData, setStoreData] = useState<{ name?: string } | null>(null);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [storeURL, setStoreURL] = useState<string>("");
+  const [isLoadingQR, setIsLoadingQR] = useState(false);
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -31,40 +30,102 @@ export default function Dashboard() {
     }
   }, [session, isPending, router]);
 
-  // Check menu items and get store data
-  const checkMenuItems = useCallback(async () => {
+  // Get store data
+  const getStoreData = useCallback(async () => {
     if (!session?.user?.email) return;
 
     try {
-      const [menuResponse, onboardingResponse] = await Promise.all([
-        fetch(`/api/menu/get?email=${encodeURIComponent(session.user.email)}`),
-        fetch(
-          `/api/onboarding?email=${encodeURIComponent(session.user.email)}`
-        ),
-      ]);
+      const onboardingResponse = await fetch(
+        `/api/onboarding?email=${encodeURIComponent(session.user.email)}`
+      );
 
-      const menuData = await menuResponse.json();
       const onboardingData = await onboardingResponse.json();
-
-      if (menuData.success && menuData.menuItems) {
-        setHasMenuItems(menuData.menuItems.length > 0);
-        setMenuItemsCount(menuData.menuItems.length);
-      } else {
-        setHasMenuItems(false);
-        setMenuItemsCount(0);
-      }
 
       if (onboardingData.store) {
         setStoreData(onboardingData.store);
       }
     } catch (error) {
       console.error("Error checking menu items:", error);
-      setHasMenuItems(false);
-      setMenuItemsCount(0);
     } finally {
-      setIsCheckingMenu(false);
+      setIsLoadingStore(false);
     }
   }, [session?.user?.email]);
+
+  // Load QR code
+  const loadQRCode = useCallback(async () => {
+    if (!session?.user?.email) return;
+
+    setIsLoadingQR(true);
+    try {
+      const response = await fetch(
+        `/api/store/qr-code?email=${encodeURIComponent(session.user.email)}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setQrCode(data.qrCode);
+        setStoreURL(data.storeURL);
+      }
+    } catch (error) {
+      console.error("Error loading QR code:", error);
+    } finally {
+      setIsLoadingQR(false);
+    }
+  }, [session?.user?.email]);
+
+  // Generate new QR code
+  const regenerateQRCode = async () => {
+    if (!session?.user?.email) return;
+
+    setIsLoadingQR(true);
+    try {
+      const response = await fetch("/api/store/qr-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: session.user.email,
+          regenerate: true,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setQrCode(data.qrCode);
+        setStoreURL(data.storeURL);
+      }
+    } catch (error) {
+      console.error("Error regenerating QR code:", error);
+    } finally {
+      setIsLoadingQR(false);
+    }
+  };
+
+  // Download QR code
+  const downloadQRCode = () => {
+    if (!qrCode || !storeData?.name) return;
+
+    const link = document.createElement("a");
+    link.download = `${storeData.name}-qr-code.png`;
+    link.href = qrCode;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // View menu
+  const viewMenu = () => {
+    if (storeURL) {
+      window.open(storeURL, "_blank");
+    }
+  };
+
+  // Load QR code when store data is available
+  useEffect(() => {
+    if (storeData && session?.user?.email) {
+      loadQRCode();
+    }
+  }, [storeData, session?.user?.email, loadQRCode]);
 
   // Check if user has completed onboarding
   useEffect(() => {
@@ -84,8 +145,8 @@ export default function Dashboard() {
           }
           router.push("/onboarding");
         } else {
-          // Check if vendor has menu items
-          checkMenuItems();
+          // Get store data
+          getStoreData();
         }
       } catch (error) {
         console.error("Error checking onboarding status:", error);
@@ -95,9 +156,9 @@ export default function Dashboard() {
     };
 
     checkOnboardingStatus();
-  }, [session?.user?.email, router, checkMenuItems]);
+  }, [session?.user?.email, router, getStoreData]);
 
-  if (isPending || isCheckingMenu) {
+  if (isPending || isLoadingStore) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Spinner size="lg" />
@@ -124,7 +185,7 @@ export default function Dashboard() {
           </div>
 
           {/* Today's Analytics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <Card className="p-4">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -150,32 +211,6 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground">No sales today</p>
               </CardContent>
             </Card>
-
-            <Card className="p-4">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Orders
-                </CardTitle>
-                <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">All time</p>
-              </CardContent>
-            </Card>
-
-            <Card className="p-4">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Menu Items
-                </CardTitle>
-                <ChefHat className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{menuItemsCount}</div>
-                <p className="text-xs text-muted-foreground">Items available</p>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Main Action Cards */}
@@ -196,118 +231,110 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="bg-muted/50 rounded-lg p-8 flex items-center justify-center">
-                  <div className="text-center">
-                    <QrCode className="h-24 w-24 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-sm text-muted-foreground">
-                      QR Code Preview
-                    </p>
+                <div className="text-center">
+                  <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <QrCode className="h-10 w-10 text-primary" />
                   </div>
+                  <h3 className="text-lg font-semibold mb-2">Your QR Code</h3>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Share with customers to view your menu
+                  </p>
+
+                  {isLoadingQR && (
+                    <div className="flex items-center justify-center gap-2 mb-4">
+                      <Spinner className="h-4 w-4" />
+                      <span className="text-sm text-muted-foreground">
+                        Updating...
+                      </span>
+                    </div>
+                  )}
                 </div>
+
+                {storeURL && (
+                  <div className="text-center p-3 bg-muted/30 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Store URL:
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-mono break-all flex-1">
+                        {storeURL}
+                      </p>
+                      <Button
+                        onClick={() => navigator.clipboard.writeText(storeURL)}
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
-                  <Button className="flex-1" size="lg">
+                  <Button
+                    onClick={downloadQRCode}
+                    disabled={!qrCode || isLoadingQR}
+                    className="flex-1"
+                    size="lg"
+                  >
                     <Download className="mr-2 w-4 h-4" />
                     Download QR
                   </Button>
-                  <Button variant="outline" size="lg">
-                    <QrCode className="mr-2 w-4 h-4" />
-                    View Menu
+                  <Button
+                    onClick={viewMenu}
+                    disabled={!storeURL}
+                    variant="outline"
+                    size="lg"
+                  >
+                    Visit Store
                   </Button>
                 </div>
+
+                {!qrCode && !isLoadingQR && (
+                  <Button
+                    onClick={regenerateQRCode}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  >
+                    Generate QR Code
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
             {/* Menu Management */}
-            <Card className="p-6">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                    <ChefHat className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl">Menu Management</CardTitle>
-                    <p className="text-muted-foreground">
-                      Update your menu items and prices
-                    </p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-muted/50 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-primary">
-                      {menuItemsCount}
-                    </div>
-                    <p className="text-muted-foreground">Menu Items</p>
-                  </div>
-                  <div className="bg-muted/50 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-primary">1</div>
-                    <p className="text-muted-foreground">Sections</p>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <Button
-                    onClick={() => router.push("/menu/builder")}
-                    className="flex-1"
-                    size="lg"
-                  >
-                    <Edit className="mr-2 w-4 h-4" />
-                    Edit Menu
-                  </Button>
-                  <Button
-                    onClick={() => router.push("/menu/builder")}
-                    variant="outline"
-                    size="lg"
-                  >
-                    <Plus className="mr-2 w-4 h-4" />
-                    Add Items
-                  </Button>
-                </div>
-              </CardContent>
+            <Card className="p-6 flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <ChefHat className="h-10 w-10 text-primary" />
+              </div>
+              <CardTitle className="text-2xl mb-3">Menu Management</CardTitle>
+              <p className="text-muted-foreground mb-8">
+                Update your menu items and prices
+              </p>
+              <Button
+                onClick={() => router.push("/menu/builder")}
+                className="w-full max-w-xs"
+                size="lg"
+              >
+                <Edit className="mr-2 w-4 h-4" />
+                Edit Menu
+              </Button>
             </Card>
           </div>
-
-          {/* Recent Activity */}
-          <Card className="p-6">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-xl">Recent Activity</CardTitle>
-              <p className="text-muted-foreground">
-                Your latest orders and updates
-              </p>
-            </CardHeader>
-            <CardContent>
-              {hasMenuItems === false ? (
-                <div className="text-center py-12">
-                  <ChefHat className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">
-                    Create your menu first
-                  </h3>
-                  <p className="text-muted-foreground mb-6">
-                    Add your food items to start receiving orders from customers
-                  </p>
-                  <Button
-                    onClick={() => router.push("/menu/builder")}
-                    size="lg"
-                  >
-                    <Plus className="mr-2 w-4 h-4" />
-                    Create Menu
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <ShoppingBag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No orders yet</h3>
-                  <p className="text-muted-foreground mb-6">
-                    Share your QR code with customers to start receiving orders
-                  </p>
-                  <Button variant="outline">
-                    <Download className="mr-2 w-4 h-4" />
-                    Download QR Code
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
       </section>
     </main>
