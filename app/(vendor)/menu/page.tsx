@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 
 type MenuStatus = "loading" | "exists" | "empty" | "error";
 type BuilderItem = { name: string; description: string; price: string };
@@ -248,7 +249,7 @@ export default function MenuPage() {
   if (isPending || status === "loading") {
     return (
       <div className="min-h-[60vh] bg-background flex items-center justify-center">
-        <p>Loading...</p>
+        <Spinner size="lg" />
       </div>
     );
   }

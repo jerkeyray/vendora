@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { Spinner } from "@/components/ui/spinner";
 
 type Vendor = {
   id: string;
@@ -47,7 +48,7 @@ export default function Profile() {
   if (isPending) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p>Loading...</p>
+        <Spinner size="lg" />
       </div>
     );
   }

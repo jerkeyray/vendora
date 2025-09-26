@@ -16,11 +16,14 @@ import {
 import { Dialog } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function Dashboard() {
   const { data: session, isPending } = useSession();
   const email = session?.user?.email as string | undefined;
-  const [vendorStatus, setVendorStatus] = useState<'loading' | 'exists' | 'needs-setup' | 'error'>('loading');
+  const [vendorStatus, setVendorStatus] = useState<
+    "loading" | "exists" | "needs-setup" | "error"
+  >("loading");
   const hasCheckedRef = useRef<Set<string>>(new Set());
   const [form, setForm] = useState({
     phone: "",
@@ -28,7 +31,10 @@ export default function Dashboard() {
     storeName: "",
     address: "",
   });
-  const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
+  const [toast, setToast] = useState<{ show: boolean; message: string }>({
+    show: false,
+    message: "",
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -40,24 +46,24 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!email || hasCheckedRef.current.has(email)) return;
-    
+
     let cancelled = false;
-    
+
     fetch(`/api/vendor/create?email=${encodeURIComponent(email)}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
         if (data?.exists) {
-          setVendorStatus('exists');
+          setVendorStatus("exists");
           hasCheckedRef.current.add(email);
         } else {
-          setVendorStatus('needs-setup');
+          setVendorStatus("needs-setup");
           hasCheckedRef.current.add(email);
         }
       })
       .catch(() => {
         if (cancelled) return;
-        setVendorStatus('error');
+        setVendorStatus("error");
         hasCheckedRef.current.delete(email); // Allow retry on error
       });
 
@@ -113,15 +119,15 @@ export default function Dashboard() {
 
   const submitSetup = async () => {
     if (!email || isSubmitting) return;
-    
+
     // Validate form before submission
     if (!validateForm()) {
       return;
     }
 
     setIsSubmitting(true);
-    setVendorStatus('exists');
-    setToast({ show: true, message: 'Onboarding saved' });
+    setVendorStatus("exists");
+    setToast({ show: true, message: "Onboarding saved" });
 
     const res = await fetch("/api/vendor/create", {
       method: "POST",
@@ -129,15 +135,15 @@ export default function Dashboard() {
       body: JSON.stringify({ email, ...form }),
     });
     if (res.ok) {
-      setVendorStatus('exists');
+      setVendorStatus("exists");
     }
     setIsSubmitting(false);
   };
 
-  if (isPending || vendorStatus === 'loading') {
+  if (isPending || vendorStatus === "loading") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p>Loading...</p>
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -153,7 +159,11 @@ export default function Dashboard() {
           {toast.message}
         </div>
       )}
-      <Dialog open={vendorStatus === 'needs-setup'} onOpenChange={() => {}} title="Complete your vendor setup">
+      <Dialog
+        open={vendorStatus === "needs-setup"}
+        onOpenChange={() => {}}
+        title="Complete your vendor setup"
+      >
         <div className="space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="storeName">Store Name *</Label>
@@ -190,7 +200,7 @@ export default function Dashboard() {
               value={form.phone}
               onChange={(e) => {
                 // Only allow digits and limit to 10 characters
-                const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                const value = e.target.value.replace(/\D/g, "").slice(0, 10);
                 setForm({ ...form, phone: value });
                 if (errors.phone) {
                   setErrors({ ...errors, phone: "" });
@@ -290,9 +300,12 @@ export default function Dashboard() {
                     </p>
                   </div>
                 </div>
-          <Button variant="outline" onClick={() => setVendorStatus('needs-setup')}>
-            Set up vendor
-          </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setVendorStatus("needs-setup")}
+                >
+                  Set up vendor
+                </Button>
               </div>
 
               <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -331,5 +344,3 @@ export default function Dashboard() {
     </main>
   );
 }
-
-

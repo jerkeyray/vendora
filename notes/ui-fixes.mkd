@@ -1,0 +1,11 @@
+- fix placeholder shitty text
+- nice loading animation or something
+- toast appearing at the top right after login
+- if logged in and no store setup the whole page should be asking to setup the store instead of the regular page on dashboard
+- on top navbar remove welcome/ name text
+- vendor already created then don't show setup vendor screen
+- menu bar is fuckin weird
+- menu creator is way too wide
+- qr 
+- user page
+- real time order confirmation

@@ -17,6 +17,7 @@ import {
   Zap,
   CheckCircle,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -184,7 +185,7 @@ export default function Home() {
             <div className="hero-buttons flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center">
               {isPending ? (
                 <Button size="lg" disabled>
-                  Loading...
+                  <Spinner size="sm" variant="white" />
                 </Button>
               ) : session ? (
                 <Link href="/dashboard">
@@ -298,7 +299,7 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
               {isPending ? (
                 <Button size="lg" disabled>
-                  Loading...
+                  <Spinner size="sm" variant="white" />
                 </Button>
               ) : session ? (
                 <Link href="/dashboard">
