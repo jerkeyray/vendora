@@ -1,2 +1,4 @@
 - don't execute terminal commands yourself, just provide them to me and i'll run them
 - we are using bun 
+- implement a minimal black white purple ui, use shadcn components 
+- dont use icons instead use icon libraries

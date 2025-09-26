@@ -7,6 +7,7 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
