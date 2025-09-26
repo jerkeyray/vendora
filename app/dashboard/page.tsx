@@ -2,10 +2,11 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SignOutButton } from "@/components/auth/SignOutButton";
+import Link from "next/link";
+import { Avatar } from "@/components/ui/avatar";
 import { useSession } from "@/lib/auth-client";
 import { redirect } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Store,
   Menu,
@@ -14,9 +15,21 @@ import {
   IndianRupee,
   ChefHat,
 } from "lucide-react";
+import { Dialog } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export default function Dashboard() {
   const { data: session, isPending } = useSession();
+  const email = session?.user?.email as string | undefined;
+  const [vendorStatus, setVendorStatus] = useState<'loading' | 'exists' | 'needs-setup' | 'error'>('loading');
+  const hasCheckedRef = useRef<Set<string>>(new Set());
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    upiId: "",
+  });
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -24,7 +37,56 @@ export default function Dashboard() {
     }
   }, [session, isPending]);
 
-  if (isPending) {
+  useEffect(() => {
+    if (!email || hasCheckedRef.current.has(email)) return;
+    
+    let cancelled = false;
+    
+    fetch(`/api/vendor/create?email=${encodeURIComponent(email)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.exists) {
+          setVendorStatus('exists');
+          hasCheckedRef.current.add(email);
+        } else {
+          setVendorStatus('needs-setup');
+          setForm((f) => ({ ...f, email: email, name: session?.user?.name || "" }));
+          hasCheckedRef.current.add(email);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setVendorStatus('error');
+        hasCheckedRef.current.delete(email); // Allow retry on error
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [email, session?.user?.name]);
+
+  const canSubmit = useMemo(() => {
+    return (
+      form.name.trim().length > 1 &&
+      form.email.includes("@") &&
+      form.upiId.trim().length > 3
+    );
+  }, [form]);
+
+  const submitSetup = async () => {
+    if (!canSubmit || !email) return;
+    const res = await fetch("/api/vendor/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    if (res.ok) {
+      setVendorStatus('exists');
+    }
+  };
+
+  if (isPending || vendorStatus === 'loading') {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p>Loading...</p>
@@ -38,15 +100,78 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-background">
+      <Dialog open={vendorStatus === 'needs-setup'} onOpenChange={() => {}} title="Complete your vendor setup">
+        <div className="space-y-4">
+          <div className="grid gap-2">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Your full name"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="you@example.com"
+              disabled
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="Optional"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="upi">UPI ID</Label>
+            <Input
+              id="upi"
+              value={form.upiId}
+              onChange={(e) => setForm({ ...form, upiId: e.target.value })}
+              placeholder="yourname@bank"
+            />
+          </div>
+          <div className="pt-2 flex justify-end">
+            <Button onClick={submitSetup} disabled={!canSubmit}>
+              Save and continue
+            </Button>
+          </div>
+        </div>
+      </Dialog>
       {/* Header */}
       <header className="border-b">
-        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between relative">
           <h1 className="text-2xl font-bold">Vendora Dashboard</h1>
+
+          <nav className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-8">
+            <Link href="/dashboard" className="text-sm font-medium text-foreground/80 hover:text-foreground">Dashboard</Link>
+            <Link href="/menu" className="text-sm font-medium text-foreground/80 hover:text-foreground">Menu</Link>
+            <Link href="/orders" className="text-sm font-medium text-foreground/80 hover:text-foreground">Orders</Link>
+            <Link href="/analytics" className="text-sm font-medium text-foreground/80 hover:text-foreground">Analytics</Link>
+          </nav>
+
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">
               Welcome, {session.user.name}
             </span>
-            <SignOutButton />
+            <Link href="/profile" aria-label="Profile">
+              <Avatar
+                src={(session.user.image as string | null) || undefined}
+                alt={session.user.name as string}
+                fallback={(session.user.name as string) || (session.user.email as string)}
+                email={session.user.email as string}
+                size={36}
+              />
+            </Link>
           </div>
         </div>
       </header>
@@ -110,9 +235,9 @@ export default function Dashboard() {
                     </p>
                   </div>
                 </div>
-                <Button variant="outline" disabled>
-                  Coming Soon
-                </Button>
+          <Button variant="outline" onClick={() => setVendorStatus('needs-setup')}>
+            Set up vendor
+          </Button>
               </div>
 
               <div className="flex items-center justify-between p-4 border rounded-lg">
