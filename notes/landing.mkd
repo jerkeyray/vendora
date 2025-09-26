@@ -1,0 +1,26 @@
+<!--  -->
+<!--  -->
+<!--  -->
+<!--  -->
+<!-- ##third section improvements: -->
+<!-- >third section has the two main cards popping out yes, but at the same time I want them to slide towards the centre from their extremities asw using gsap -->
+<!-- >the graph should be a bit lively, the peaks etc should be moving up and down like a heartbeat kinda pulse for the initial "n" seconds. it should eventually stop once the page becomes static -->
+<!-- //>(text changes types) baad me -->
+<!--  -->
+
+<!-- 
+##later to add fourth section
+>may add FAQs later on using my notion faqs
+>dekhenge -->
+
+###OVERALL TEXT IMPROVEMENT IN EACH SECTION
+
+##first section improvements:
+##second section improvements:
+    >nav bar should be rounded
+    >nav bar should have transparent look glass ui
+    >second section each card actually means useful stuff (content)
+
+##fourth section improvements:
+    >faqs vgrh
+    >

@@ -13,7 +13,7 @@ export function SignInButton() {
 
   return (
     <Button onClick={handleSignIn} size="lg">
-      Sign in with Google
+      Get Started
     </Button>
   );
 }
