@@ -3,3 +3,4 @@
 - implement a minimal black white purple ui, use shadcn components 
 - dont use icons instead use icon libraries
 - make sure to not have unused variables
+- do not create new loaders just use one throughout the project

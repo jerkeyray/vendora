@@ -7,7 +7,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Minus, Plus, ShoppingCart, User, Phone } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Minus,
+  Plus,
+  ShoppingCart,
+  User,
+  Phone,
+  Copy,
+  ExternalLink,
+  CheckCircle,
+} from "lucide-react";
 
 interface MenuItem {
   id: string;
@@ -55,6 +70,13 @@ export default function OrderPage() {
   const [error, setError] = useState<string | null>(null);
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentInfo, setPaymentInfo] = useState<{
+    orderNumber: string;
+    upiId: string;
+    amount: number;
+    storeName: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchStoreAndMenu = async () => {
@@ -186,20 +208,26 @@ export default function OrderPage() {
         `Order ${result.order.orderNumber}`
       )}`;
 
+      // Store order number in localStorage for tracking
+      localStorage.setItem("currentOrderNumber", result.order.orderNumber);
+
+      // Set payment info and show modal
+      setPaymentInfo({
+        orderNumber: result.order.orderNumber,
+        upiId: result.vendor.upiId,
+        amount: getTotalAmount(),
+        storeName: store?.name || "Store",
+      });
+      setShowPaymentModal(true);
+
       // For mobile devices, try to open UPI app
       if (
         /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
           navigator.userAgent
         )
       ) {
+        // Open UPI app
         window.location.href = upiUrl;
-      } else {
-        // For desktop, show UPI ID
-        alert(
-          `Please pay ₹${getTotalAmount()} to UPI ID: ${
-            result.vendor.upiId
-          }\nOrder Number: ${result.order.orderNumber}`
-        );
       }
 
       // Clear cart after payment initiation
@@ -538,6 +566,108 @@ export default function OrderPage() {
           </div>
         </div>
       </div>
+
+      {/* Payment Modal */}
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              Order Placed Successfully!
+            </DialogTitle>
+          </DialogHeader>
+
+          {paymentInfo && (
+            <div className="space-y-4">
+              <div className="text-center">
+                <div className="text-sm text-muted-foreground mb-2">
+                  Order Number
+                </div>
+                <div className="font-mono text-lg font-bold">
+                  {paymentInfo.orderNumber}
+                </div>
+              </div>
+
+              <div className="bg-muted/30 p-4 rounded-lg space-y-3">
+                <div className="text-sm font-medium">Payment Details:</div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">UPI ID:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm">
+                      {paymentInfo.upiId}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 w-6 p-0"
+                      onClick={() =>
+                        navigator.clipboard.writeText(paymentInfo.upiId)
+                      }
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Amount:</span>
+                  <span className="font-bold text-primary">
+                    ₹{paymentInfo.amount}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Store:</span>
+                  <span className="font-medium">{paymentInfo.storeName}</span>
+                </div>
+              </div>
+
+              <div className="text-sm text-muted-foreground text-center">
+                {/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+                  navigator.userAgent
+                )
+                  ? "Your UPI app should have opened automatically. Complete the payment and return here."
+                  : "Please pay using any UPI app with the above details."}
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    window.location.href = `/order/${paymentInfo.orderNumber}`;
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Track Order
+                </Button>
+
+                {!/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+                  navigator.userAgent
+                ) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const upiUrl = `upi://pay?pa=${
+                        paymentInfo.upiId
+                      }&pn=${encodeURIComponent(paymentInfo.storeName)}&am=${
+                        paymentInfo.amount
+                      }&cu=INR&tn=${encodeURIComponent(
+                        `Order ${paymentInfo.orderNumber}`
+                      )}`;
+                      window.location.href = upiUrl;
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open UPI
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

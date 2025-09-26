@@ -83,7 +83,6 @@ model Vendor {
 model Store {
   id          String       @id @default(cuid())
   name        String
-  slug        String?      @unique
   description String?
   address     String?
   qrCode      String?
@@ -91,6 +90,7 @@ model Store {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   vendorId    String       @unique
+  slug        String?      @unique
   dailySales  DailySales[]
   itemSales   ItemSales[]
   menus       Menu[]

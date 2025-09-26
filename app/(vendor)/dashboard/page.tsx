@@ -12,6 +12,8 @@ import {
   Download,
   TrendingUp,
   Calendar,
+  ClipboardCheck,
+  Package,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -23,6 +25,11 @@ export default function Dashboard() {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [storeURL, setStoreURL] = useState<string>("");
   const [isLoadingQR, setIsLoadingQR] = useState(false);
+  const [orderStats, setOrderStats] = useState({
+    pending: 0,
+    todayTotal: 0,
+    todayRevenue: 0,
+  });
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -124,12 +131,52 @@ export default function Dashboard() {
     }
   };
 
+  // Fetch order statistics
+  const fetchOrderStats = useCallback(async () => {
+    if (!session?.user?.email) return;
+
+    try {
+      const response = await fetch(
+        `/api/orders/vendor?email=${encodeURIComponent(session.user.email)}`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const orders = data.orders;
+
+        // Get today's date
+        const today = new Date().toDateString();
+
+        // Calculate today's orders and revenue
+        const todayOrders = orders.all.filter(
+          (order: { createdAt: string }) =>
+            new Date(order.createdAt).toDateString() === today
+        );
+
+        const todayRevenue = todayOrders.reduce(
+          (sum: number, order: { totalAmount: string | number }) =>
+            sum + parseFloat(order.totalAmount.toString()),
+          0
+        );
+
+        setOrderStats({
+          pending: orders.pending.length,
+          todayTotal: todayOrders.length,
+          todayRevenue: todayRevenue,
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching order stats:", error);
+    }
+  }, [session?.user?.email]);
+
   // Load QR code when store data is available
   useEffect(() => {
     if (storeData && session?.user?.email) {
       loadQRCode();
+      fetchOrderStats();
     }
-  }, [storeData, session?.user?.email, loadQRCode]);
+  }, [storeData, session?.user?.email, loadQRCode, fetchOrderStats]);
 
   // Check if user has completed onboarding
   useEffect(() => {
@@ -189,7 +236,7 @@ export default function Dashboard() {
           </div>
 
           {/* Today's Analytics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <Card className="p-4">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -198,8 +245,16 @@ export default function Dashboard() {
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">No orders today</p>
+                <div className="text-2xl font-bold">
+                  {orderStats.todayTotal}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {orderStats.todayTotal === 0
+                    ? "No orders today"
+                    : orderStats.todayTotal === 1
+                    ? "1 order today"
+                    : `${orderStats.todayTotal} orders today`}
+                </p>
               </CardContent>
             </Card>
 
@@ -211,14 +266,44 @@ export default function Dashboard() {
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">₹0</div>
-                <p className="text-xs text-muted-foreground">No sales today</p>
+                <div className="text-2xl font-bold">
+                  ₹{orderStats.todayRevenue}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {orderStats.todayRevenue === 0
+                    ? "No sales today"
+                    : "Total earnings today"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card
+              className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => router.push("/orders")}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Pending Orders
+                </CardTitle>
+                <ClipboardCheck className="h-4 w-4 text-blue-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">
+                  {orderStats.pending}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {orderStats.pending === 0
+                    ? "No pending orders"
+                    : orderStats.pending === 1
+                    ? "1 order needs attention"
+                    : `${orderStats.pending} orders need attention`}
+                </p>
               </CardContent>
             </Card>
           </div>
 
           {/* Main Action Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             {/* QR Code Section */}
             <Card className="p-6">
               <CardHeader className="pb-4">
@@ -354,6 +439,25 @@ export default function Dashboard() {
               >
                 <Edit className="mr-2 w-4 h-4" />
                 Edit Menu
+              </Button>
+            </Card>
+
+            {/* Orders Management */}
+            <Card className="p-6 flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <ClipboardCheck className="h-10 w-10 text-blue-600" />
+              </div>
+              <CardTitle className="text-2xl mb-3">Orders Management</CardTitle>
+              <p className="text-muted-foreground mb-8">
+                Accept orders and manage your queue
+              </p>
+              <Button
+                onClick={() => router.push("/orders")}
+                className="w-full max-w-xs bg-blue-600 hover:bg-blue-700"
+                size="lg"
+              >
+                <Package className="mr-2 w-4 h-4" />
+                Manage Orders
               </Button>
             </Card>
           </div>
