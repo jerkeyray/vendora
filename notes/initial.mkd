@@ -1,0 +1,17 @@
+vendora : digitizing indian street food commerce
+
+### vendor side
+- a vendor for let's say a local shawarma stall can come to vendora and create his own menu page on the web. we will ask him for his stall name, upi id, some more info about his store and then finally take him to our menu builder.
+
+### customer side
+- a customer will come to the vendor's local store and scan the qr code which vendora will provide which then takes them to digital menu where they can browse the items and add the ones they want to a cart. then they click on a pay now button and get redirected to their upi app.
+
+### vendor-client interaction
+- since we can never actually receive the payment confirmation from the upi payment on the vendor's side, we have a manual system for order confirmation. after making the paytment on the upi app the customer will return to our page and click on a "payment complete" button, this then sends an order ticket to the vendors page, suppose a page where all the incoming orders get stacked. the vendor upon hearing the payment confirmation from his upi machine will just click on the confirm order button else he can reject it.
+
+### vendor features
+- we want to help vendors digitizing their manual bookkeeping by providing them with accurate and useful analytics and graphs.    
+
+# tech stack
+- nextjs, supabase, framer, gsap, bun, prisma
+
