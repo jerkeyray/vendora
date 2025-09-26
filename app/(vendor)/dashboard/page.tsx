@@ -32,6 +32,8 @@ export default function Dashboard() {
   });
   const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [store, setStore] = useState<any>(null);
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -67,17 +69,59 @@ export default function Dashboard() {
     };
   }, [email, session?.user?.name]);
 
+  // Validation functions
+  const validatePhone = (phone: string): boolean => {
+    const phoneRegex = /^\d{10}$/;
+    return phoneRegex.test(phone);
+  };
+
+  const validateUPI = (upi: string): boolean => {
+    // UPI ID format: username@bank or username@upi
+    const upiRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+$/;
+    return upiRegex.test(upi);
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: { [key: string]: string } = {};
+
+    // Store name validation
+    if (!form.storeName.trim()) {
+      newErrors.storeName = "Store name is required";
+    }
+
+    // Phone validation (optional but if provided, must be valid)
+    if (form.phone.trim() && !validatePhone(form.phone.trim())) {
+      newErrors.phone = "Phone number must be exactly 10 digits";
+    }
+
+    // UPI ID validation
+    if (!form.upiId.trim()) {
+      newErrors.upiId = "UPI ID is required";
+    } else if (!validateUPI(form.upiId.trim())) {
+      newErrors.upiId = "Please enter a valid UPI ID (e.g., yourname@bank)";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const canSubmit = useMemo(() => {
     return (
       form.upiId.trim().length > 3 &&
-      form.storeName.trim().length > 1
+      form.storeName.trim().length > 1 &&
+      validatePhone(form.phone.trim()) &&
+      validateUPI(form.upiId.trim())
     );
   }, [form]);
 
   const submitSetup = async () => {
-    if (!canSubmit || !email) return;
     if (!email || isSubmitting) return;
-    // Optimistic confirmation + close
+    
+    // Validate form before submission
+    if (!validateForm()) {
+      return;
+    }
+
     setIsSubmitting(true);
     setVendorStatus('exists');
     setToast({ show: true, message: 'Onboarding saved' });
@@ -88,7 +132,9 @@ export default function Dashboard() {
       body: JSON.stringify({ email, ...form }),
     });
     if (res.ok) {
+      const data = await res.json();
       setVendorStatus('exists');
+      setStore(data.store);
     }
     setIsSubmitting(false);
   };
@@ -115,13 +161,22 @@ export default function Dashboard() {
       <Dialog open={vendorStatus === 'needs-setup'} onOpenChange={() => {}} title="Complete your vendor setup">
         <div className="space-y-4">
           <div className="grid gap-2">
-            <Label htmlFor="storeName">Store Name</Label>
+            <Label htmlFor="storeName">Store Name *</Label>
             <Input
               id="storeName"
               value={form.storeName}
-              onChange={(e) => setForm({ ...form, storeName: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, storeName: e.target.value });
+                if (errors.storeName) {
+                  setErrors({ ...errors, storeName: "" });
+                }
+              }}
               placeholder="Your store name"
+              className={errors.storeName ? "border-red-500" : ""}
             />
+            {errors.storeName && (
+              <p className="text-sm text-red-500">{errors.storeName}</p>
+            )}
           </div>
           <div className="grid gap-2">
             <Label htmlFor="address">Address</Label>
@@ -136,19 +191,40 @@ export default function Dashboard() {
             <Label htmlFor="phone">Phone</Label>
             <Input
               id="phone"
+              type="tel"
               value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              placeholder="Optional"
+              onChange={(e) => {
+                // Only allow digits and limit to 10 characters
+                const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                setForm({ ...form, phone: value });
+                if (errors.phone) {
+                  setErrors({ ...errors, phone: "" });
+                }
+              }}
+              placeholder="10 digit phone number (optional)"
+              className={errors.phone ? "border-red-500" : ""}
             />
+            {errors.phone && (
+              <p className="text-sm text-red-500">{errors.phone}</p>
+            )}
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="upi">UPI ID</Label>
+            <Label htmlFor="upi">UPI ID *</Label>
             <Input
               id="upi"
               value={form.upiId}
-              onChange={(e) => setForm({ ...form, upiId: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, upiId: e.target.value });
+                if (errors.upiId) {
+                  setErrors({ ...errors, upiId: "" });
+                }
+              }}
               placeholder="yourname@bank"
+              className={errors.upiId ? "border-red-500" : ""}
             />
+            {errors.upiId && (
+              <p className="text-sm text-red-500">{errors.upiId}</p>
+            )}
           </div>
           <div className="pt-2 flex justify-end">
             <Button onClick={submitSetup} disabled={!canSubmit}>

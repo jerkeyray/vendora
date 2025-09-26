@@ -45,33 +45,44 @@ export default function Profile() {
           <CardHeader>
             <CardTitle className="text-lg">Profile</CardTitle>
           </CardHeader>
-          <CardContent className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Avatar
-                src={(session.user.image as string | null) || undefined}
-                alt={session.user.name as string}
-                fallback={(session.user.name as string) || (session.user.email as string)}
-                email={session.user.email as string}
-                size={48}
-              />
-              <div className="space-y-1">
-                <div className="text-sm font-medium">{session.user.name}</div>
-                <div className="text-xs text-muted-foreground">{session.user.email}</div>
-                {vendor && (
-                  <div className="grid text-xs gap-1 pt-2">
-                    <div>Vendor: {vendor.name}</div>
-                    <div>Phone: {vendor.phone || "-"}</div>
-                    <div>UPI: {vendor.upiId}</div>
-                    {vendor.store && (
-                      <div className="pt-1">Store: {vendor.store.name}{vendor.store.address ? ` · ${vendor.store.address}` : ""}</div>
-                    )}
-                  </div>
-                )}
+          <CardContent>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Avatar
+                  src={(session.user.image as string | null) || undefined}
+                  alt={session.user.name as string}
+                  fallback={(session.user.name as string) || (session.user.email as string)}
+                  email={session.user.email as string}
+                  size={48}
+                />
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">{session.user.name}</div>
+                  <div className="text-xs text-muted-foreground">{session.user.email}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowDialog(true)} className="border rounded-md px-3 py-2 text-xs">Setup Store</button>
+                <SignOutButton />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setShowDialog(true)} className="border rounded-md px-3 py-2 text-xs">Setup Store</button>
-              <SignOutButton />
+
+            <div className="mt-6 grid gap-2 text-sm">
+              <div className="flex justify-between border-b py-2">
+                <span className="text-muted-foreground">Store name</span>
+                <span>{vendor?.store?.name || "-"}</span>
+              </div>
+              <div className="flex justify-between border-b py-2">
+                <span className="text-muted-foreground">Address</span>
+                <span className="text-right max-w-[60%]">{vendor?.store?.address || "-"}</span>
+              </div>
+              <div className="flex justify-between border-b py-2">
+                <span className="text-muted-foreground">Phone</span>
+                <span>{vendor?.phone || "-"}</span>
+              </div>
+              <div className="flex justify-between border-b py-2">
+                <span className="text-muted-foreground">UPI ID</span>
+                <span>{vendor?.upiId || "-"}</span>
+              </div>
             </div>
           </CardContent>
         </Card>

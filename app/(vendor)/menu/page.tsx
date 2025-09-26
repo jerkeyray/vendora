@@ -83,6 +83,7 @@ export default function MenuPage() {
   const [sections, setSections] = useState<BuilderSection[]>([]);
   const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
   const canSubmit = useMemo(() => form.name.trim().length > 1, [form]);
 
   const createMenu = async () => {
@@ -116,7 +117,20 @@ export default function MenuPage() {
     setSections((s) => s.map((sec, i) => (i === sIdx ? { ...sec, items: sec.items.map((it, j) => (j === iIdx ? { ...it, ...patch } : it)) } : sec)));
   };
 
-  const canBuild = useMemo(() => sections.length > 0 && sections.every(sec => sec.name.trim() && sec.items.length > 0 && sec.items.every(it => it.name.trim() && !!Number(it.price))), [sections]);
+  const canBuild = useMemo(() => 
+    sections.length > 0 && 
+    sections.every(sec => 
+      sec.name.trim() && 
+      sec.items.length > 0 && 
+      sec.items.every(it => 
+        it.name.trim() && 
+        it.description.trim() && 
+        !!Number(it.price) && 
+        Number(it.price) > 0
+      )
+    ), 
+    [sections]
+  );
 
   // Build a lightweight local view model for instant UI updates
   function localMenuFromSections(name: string): MenuData {
@@ -138,7 +152,10 @@ export default function MenuPage() {
   }
 
   const buildMenu = async () => {
-    if (!email || !canBuild) return;
+    if (!email || !canBuild) {
+      setShowValidation(true);
+      return;
+    }
     if (isSubmitting) return;
     setIsSubmitting(true);
 
@@ -233,8 +250,13 @@ export default function MenuPage() {
                     {sections.map((section, sIdx) => (
                       <div key={sIdx} className="border rounded-lg p-4">
                         <div className="grid gap-2 mb-3">
-                          <Label>Section Name</Label>
-                          <Input value={section.name} onChange={(e) => updateSection(sIdx, { name: e.target.value })} placeholder="Starters" />
+                          <Label>Section Name *</Label>
+                          <Input 
+                            value={section.name} 
+                            onChange={(e) => updateSection(sIdx, { name: e.target.value })} 
+                            placeholder="Starters" 
+                            className={showValidation && !section.name.trim() ? "border-red-500" : ""}
+                          />
                         </div>
                         <div className="flex items-center justify-between mb-2">
                           <h5 className="font-medium">Items</h5>
@@ -244,16 +266,33 @@ export default function MenuPage() {
                           {section.items.map((item, iIdx) => (
                             <div key={iIdx} className="grid md:grid-cols-3 gap-3 items-end">
                               <div className="grid gap-1">
-                                <Label>Name</Label>
-                                <Input value={item.name} onChange={(e) => updateItem(sIdx, iIdx, { name: e.target.value })} placeholder="Paneer Tikka" />
+                                <Label>Name *</Label>
+                                <Input 
+                                  value={item.name} 
+                                  onChange={(e) => updateItem(sIdx, iIdx, { name: e.target.value })} 
+                                  placeholder="Paneer Tikka" 
+                                  className={showValidation && !item.name.trim() ? "border-red-500" : ""}
+                                />
                               </div>
                               <div className="grid gap-1">
-                                <Label>Description</Label>
-                                <Input value={item.description} onChange={(e) => updateItem(sIdx, iIdx, { description: e.target.value })} placeholder="Optional" />
+                                <Label>Description *</Label>
+                                <Input 
+                                  value={item.description} 
+                                  onChange={(e) => updateItem(sIdx, iIdx, { description: e.target.value })} 
+                                  placeholder="Required" 
+                                  className={showValidation && !item.description.trim() ? "border-red-500" : ""}
+                                />
                               </div>
                               <div className="grid gap-1">
-                                <Label>Price (₹)</Label>
-                                <Input type="number" inputMode="decimal" value={item.price} onChange={(e) => updateItem(sIdx, iIdx, { price: e.target.value })} placeholder="199" />
+                                <Label>Price (₹) *</Label>
+                                <Input 
+                                  type="number" 
+                                  inputMode="decimal" 
+                                  value={item.price} 
+                                  onChange={(e) => updateItem(sIdx, iIdx, { price: e.target.value })} 
+                                  placeholder="199" 
+                                  className={showValidation && (!item.price || Number(item.price) <= 0) ? "border-red-500" : ""}
+                                />
                               </div>
                               <div className="md:col-span-3 flex justify-end">
                                 <Button size="sm" variant="outline" onClick={() => removeItem(sIdx, iIdx)}>Remove Item</Button>
@@ -268,7 +307,10 @@ export default function MenuPage() {
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={() => { setStep('menu'); setShowForm(false); setIsEditing(false); }}>Cancel</Button>
                     <Button onClick={isEditing ? async () => {
-                      if (!email || !canBuild) return;
+                      if (!email || !canBuild) {
+                        setShowValidation(true);
+                        return;
+                      }
                       if (isSubmitting) return;
                       setIsSubmitting(true);
 

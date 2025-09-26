@@ -49,7 +49,9 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
     <main className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between relative">
-          <h1 className="text-2xl font-bold">{storeName || "Vendora"}</h1>
+          <Link href="/dashboard" className="text-2xl font-bold text-black">
+            Vendora
+          </Link>
 
           <nav className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-8">
             <Link href="/dashboard" className={`text-sm font-medium ${isActive("/dashboard") ? "text-foreground" : "text-foreground/80 hover:text-foreground"}`}>Dashboard</Link>
