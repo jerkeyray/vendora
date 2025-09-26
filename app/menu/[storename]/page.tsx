@@ -224,21 +224,8 @@ export default function OrderPage() {
   if (error || !store || !menu) {
     return (
       <div className="min-h-screen bg-background">
-        {/* Header */}
-        <header className="border-b border-border">
-          <div className="container mx-auto px-4 py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-bold text-foreground">
-                  Vendora
-                </span>
-              </div>
-            </div>
-          </div>
-        </header>
-
         {/* Error Content */}
-        <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-[calc(100vh-80px)]">
+        <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
           <div className="text-center max-w-md mx-auto">
             <div className="mb-8">
               <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
@@ -267,51 +254,48 @@ export default function OrderPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                {store.name}
-              </h1>
-              {store.address && (
-                <p className="text-sm text-muted-foreground">{store.address}</p>
-              )}
-            </div>
-            {cart.length > 0 && (
-              <Button
-                onClick={() =>
-                  document
-                    .getElementById("cart")
-                    ?.scrollIntoView({ behavior: "smooth" })
-                }
-                className="relative"
-                variant="outline"
-              >
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Cart ({getTotalItems()})
-                <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center text-xs">
-                  {getTotalItems()}
-                </Badge>
-              </Button>
-            )}
-          </div>
+      {/* Mobile Cart Button - Fixed position for easy access */}
+      {cart.length > 0 && (
+        <div className="fixed top-4 right-4 z-50 lg:hidden">
+          <Button
+            onClick={() =>
+              document
+                .getElementById("cart")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
+            className="relative shadow-lg"
+            size="sm"
+          >
+            <ShoppingCart className="h-4 w-4 mr-1" />
+            {getTotalItems()}
+            <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center text-xs">
+              {getTotalItems()}
+            </Badge>
+          </Button>
         </div>
-      </header>
+      )}
 
       <div className="container mx-auto px-4 py-6">
+        {/* Store Header */}
+        <div className="mb-8 text-center lg:text-left">
+          <h1 className="text-3xl font-bold text-foreground mb-2">
+            {store.name}
+          </h1>
+          {store.description && (
+            <p className="text-muted-foreground mb-2">{store.description}</p>
+          )}
+          {store.address && (
+            <p className="text-sm text-muted-foreground">{store.address}</p>
+          )}
+          <div className="h-1 w-20 bg-primary rounded-full mx-auto lg:mx-0 mt-4"></div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Menu Items */}
-          <div className="lg:col-span-3">
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold mb-2">{menu.name}</h2>
-              <div className="h-1 w-16 bg-primary rounded-full"></div>
-            </div>
-
+          <div className="lg:col-span-3 order-2 lg:order-1">
             {menu.categories.map((category) => (
               <div key={category.id} className="mb-10">
-                <div className="sticky top-20 bg-background/95 backdrop-blur-sm z-10 py-3 mb-6 border-b border-border">
+                <div className="sticky top-4 bg-background/95 backdrop-blur-sm z-10 py-3 mb-6 border-b border-border">
                   <h3 className="text-xl font-bold text-foreground flex items-center gap-3">
                     <div className="w-2 h-6 bg-primary rounded-full"></div>
                     {category.name}
@@ -329,7 +313,7 @@ export default function OrderPage() {
                     .map((item) => (
                       <Card
                         key={item.id}
-                        className="overflow-hidden hover:shadow-md transition-all duration-200 border-l-4 border-l-transparent hover:border-l-primary"
+                        className="overflow-hidden hover:shadow-md transition-all duration-200 border border-border hover:border-primary/30"
                       >
                         <CardContent className="p-0">
                           <div className="flex items-center">
@@ -409,8 +393,8 @@ export default function OrderPage() {
           </div>
 
           {/* Cart Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-24">
+          <div className="lg:col-span-1 order-1 lg:order-2">
+            <div className="sticky top-8">
               <Card id="cart" className="shadow-lg">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-lg">

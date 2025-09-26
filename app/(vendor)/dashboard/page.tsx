@@ -117,6 +117,10 @@ export default function Dashboard() {
   const viewMenu = () => {
     if (storeURL) {
       window.open(storeURL, "_blank");
+    } else if (storeData?.name) {
+      // If no storeURL but we have store data, try to construct the URL
+      // This will trigger QR code generation if needed
+      loadQRCode();
     }
   };
 
@@ -250,7 +254,7 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                {storeURL && (
+                {storeURL ? (
                   <div className="text-center p-3 bg-muted/30 rounded-lg">
                     <p className="text-xs text-muted-foreground mb-1">
                       Store URL:
@@ -264,6 +268,7 @@ export default function Dashboard() {
                         variant="outline"
                         size="sm"
                         className="h-8 w-8 p-0"
+                        title="Copy URL"
                       >
                         <svg
                           className="h-4 w-4"
@@ -280,6 +285,12 @@ export default function Dashboard() {
                         </svg>
                       </Button>
                     </div>
+                  </div>
+                ) : (
+                  <div className="text-center p-3 bg-muted/30 rounded-lg">
+                    <p className="text-xs text-muted-foreground">
+                      Store URL will appear here once generated
+                    </p>
                   </div>
                 )}
 
@@ -311,6 +322,17 @@ export default function Dashboard() {
                     className="w-full"
                   >
                     Generate QR Code
+                  </Button>
+                )}
+
+                {!storeURL && !isLoadingQR && qrCode && (
+                  <Button
+                    onClick={loadQRCode}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  >
+                    Load Store URL
                   </Button>
                 )}
               </CardContent>
