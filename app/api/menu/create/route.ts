@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
-    const { email, name, description } = await request.json();
+    const { email, name, sections } = await request.json();
     if (!email) return NextResponse.json({ error: "Missing email" }, { status: 400 });
 
     const vendor = await prisma.vendor.findUnique({ where: { email } });
@@ -17,16 +17,44 @@ export async function POST(request: Request) {
       store = await prisma.store.create({ data: { vendorId: vendor.id, name: `${vendor.name}'s Store` } });
     }
 
-    // If already has menu, return ok
-    const existing = await prisma.menu.findFirst({ where: { storeId: store.id } });
-    if (existing) return NextResponse.json({ menu: existing }, { status: 200 });
-
-    const menu = await prisma.menu.create({ data: { storeId: store.id, name: name || "Main Menu" } });
-    if (description) {
-      // placeholder: you could store description in a separate table/field later
+    // Find or create menu
+    let menu = await prisma.menu.findFirst({ where: { storeId: store.id } });
+    if (menu) {
+      // Delete existing categories and items
+      await prisma.menuItem.deleteMany({ where: { menuId: menu.id } });
+      await prisma.category.deleteMany({ where: { menuId: menu.id } });
+    } else {
+      menu = await prisma.menu.create({ data: { storeId: store.id, name: name || "Main Menu" } });
     }
-    return NextResponse.json({ menu }, { status: 201 });
-  } catch (e) {
+
+    // Create categories and items if sections are provided
+    if (sections && sections.length > 0) {
+      for (const section of sections) {
+        const category = await prisma.category.create({
+          data: {
+            menuId: menu.id,
+            name: section.name,
+            sortOrder: 0,
+          },
+        });
+
+        for (const item of section.items) {
+          await prisma.menuItem.create({
+            data: {
+              menuId: menu.id,
+              categoryId: category.id,
+              name: item.name,
+              description: item.description || null,
+              price: Number(item.price),
+              sortOrder: 0,
+            },
+          });
+        }
+      }
+    }
+
+    return NextResponse.json({ menu }, { status: 200 });
+  } catch (_) {
     return NextResponse.json({ error: "Failed to create menu" }, { status: 500 });
   }
 }

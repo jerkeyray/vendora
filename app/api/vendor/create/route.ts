@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ vendor, store }, { status: existing ? 200 : 201 });
-  } catch (error) {
+  } catch (_) {
     return NextResponse.json(
       { error: "Failed to create vendor" },
       { status: 500 }

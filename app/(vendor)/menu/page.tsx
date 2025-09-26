@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 
 type MenuStatus = 'loading' | 'exists' | 'empty' | 'error';
 type BuilderItem = { name: string; description: string; price: string };
@@ -101,9 +100,6 @@ export default function MenuPage() {
   const addSection = () => {
     setSections((s) => [...s, { name: "", items: [] }]);
   };
-  const removeSection = (idx: number) => {
-    setSections((s) => s.filter((_, i) => i !== idx));
-  };
   const updateSection = (idx: number, patch: Partial<BuilderSection>) => {
     setSections((s) => s.map((sec, i) => (i === idx ? { ...sec, ...patch } : sec)));
   };
@@ -174,7 +170,7 @@ export default function MenuPage() {
         items: s.items.map((it) => ({ name: it.name.trim(), description: it.description.trim() || undefined, price: Number(it.price) })),
       })),
     };
-    const res = await fetch('/api/menu/builder', {
+    const res = await fetch('/api/menu/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -329,7 +325,7 @@ export default function MenuPage() {
                           items: s.items.map((it) => ({ name: it.name.trim(), description: it.description.trim() || undefined, price: Number(it.price) })),
                         })),
                       };
-                      const res = await fetch('/api/menu/builder', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                      const res = await fetch('/api/menu/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                       if (res.ok) {
                         const menuRes = await fetch(`/api/menu/get?email=${encodeURIComponent(email)}`);
                         const data = await menuRes.json();

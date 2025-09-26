@@ -4,34 +4,16 @@ import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { useSession } from "@/lib/auth-client";
 import { redirect, usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
   const { data: session, isPending } = useSession();
   const pathname = usePathname();
-  const [storeName, setStoreName] = useState<string>("");
-
   useEffect(() => {
     if (!isPending && !session) {
       redirect("/");
     }
   }, [session, isPending]);
-
-  useEffect(() => {
-    async function loadStore() {
-      const email = session?.user?.email as string | undefined;
-      if (!email) return;
-      const res = await fetch(`/api/vendor/get?email=${encodeURIComponent(email)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setStoreName(data?.vendor?.store?.name || "");
-      }
-    }
-    loadStore();
-    function onVendorUpdated() { loadStore(); }
-    window.addEventListener("vendor:updated", onVendorUpdated);
-    return () => window.removeEventListener("vendor:updated", onVendorUpdated);
-  }, [session?.user?.email]);
 
   if (isPending) {
     return (

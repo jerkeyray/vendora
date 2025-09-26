@@ -2,8 +2,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { Avatar } from "@/components/ui/avatar";
 import { useSession } from "@/lib/auth-client";
 import { redirect } from "next/navigation";
 import { useEffect, useMemo, useState, useRef } from "react";
@@ -33,7 +31,6 @@ export default function Dashboard() {
   const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [store, setStore] = useState<any>(null);
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -132,9 +129,7 @@ export default function Dashboard() {
       body: JSON.stringify({ email, ...form }),
     });
     if (res.ok) {
-      const data = await res.json();
       setVendorStatus('exists');
-      setStore(data.store);
     }
     setIsSubmitting(false);
   };

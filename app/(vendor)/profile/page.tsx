@@ -2,7 +2,7 @@
 
 import { useSession } from "@/lib/auth-client";
 import { redirect } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { SignOutButton } from "@/components/auth/SignOutButton";
