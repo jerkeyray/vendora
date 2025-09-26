@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SignInButton } from "@/components/auth/SignInButton";
-import { SignOutButton } from "@/components/auth/SignOutButton";
+import { Avatar } from "@/components/ui/avatar";
 import { useSession } from "@/lib/auth-client";
 import { QrCode, CreditCard, BarChart3 } from "lucide-react";
 
@@ -18,7 +18,21 @@ export default function Home() {
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Vendora</h1>
           {!isPending && (
-            <div>{session ? <SignOutButton /> : <SignInButton />}</div>
+            <div>
+              {session ? (
+                <Link href="/profile" aria-label="Profile">
+                  <Avatar
+                    src={(session.user.image as string | null) || undefined}
+                    alt={session.user.name as string}
+                    fallback={(session.user.name as string) || (session.user.email as string)}
+                    email={session.user.email as string}
+                    size={36}
+                  />
+                </Link>
+              ) : (
+                <SignInButton />
+              )}
+            </div>
           )}
         </div>
       </header>
