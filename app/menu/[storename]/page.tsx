@@ -3,12 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -305,87 +300,105 @@ export default function OrderPage() {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Menu Items */}
-          <div className="lg:col-span-2">
-            <h2 className="text-xl font-semibold mb-6">{menu.name}</h2>
+          <div className="lg:col-span-3">
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold mb-2">{menu.name}</h2>
+              <div className="h-1 w-16 bg-primary rounded-full"></div>
+            </div>
 
             {menu.categories.map((category) => (
-              <div key={category.id} className="mb-8">
-                <h3 className="text-lg font-medium mb-4 text-primary">
-                  {category.name}
-                </h3>
-                {category.description && (
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {category.description}
-                  </p>
-                )}
+              <div key={category.id} className="mb-10">
+                <div className="sticky top-20 bg-background/95 backdrop-blur-sm z-10 py-3 mb-6 border-b border-border">
+                  <h3 className="text-xl font-bold text-foreground flex items-center gap-3">
+                    <div className="w-2 h-6 bg-primary rounded-full"></div>
+                    {category.name}
+                  </h3>
+                  {category.description && (
+                    <p className="text-muted-foreground mt-2 ml-5">
+                      {category.description}
+                    </p>
+                  )}
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   {category.menuItems
                     .filter((item) => item.isAvailable)
                     .map((item) => (
-                      <Card key={item.id} className="overflow-hidden">
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-medium text-foreground">
-                                  {item.name}
-                                </h4>
-                                <Badge
-                                  variant={
-                                    item.isVeg ? "secondary" : "destructive"
-                                  }
-                                  className="text-xs"
-                                >
-                                  {item.isVeg ? "VEG" : "NON-VEG"}
-                                </Badge>
+                      <Card
+                        key={item.id}
+                        className="overflow-hidden hover:shadow-md transition-all duration-200 border-l-4 border-l-transparent hover:border-l-primary"
+                      >
+                        <CardContent className="p-0">
+                          <div className="flex items-center">
+                            {/* Menu Item Content */}
+                            <div className="flex-1 p-4">
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <div
+                                      className={`w-3 h-3 rounded-full border-2 ${
+                                        item.isVeg
+                                          ? "border-green-500 bg-green-500"
+                                          : "border-red-500 bg-red-500"
+                                      }`}
+                                    ></div>
+                                    <h4 className="font-semibold text-lg text-foreground">
+                                      {item.name}
+                                    </h4>
+                                  </div>
+                                  {item.description && (
+                                    <p className="text-muted-foreground text-sm leading-relaxed mb-3 ml-6">
+                                      {item.description}
+                                    </p>
+                                  )}
+                                  <div className="ml-6">
+                                    <span className="text-xl font-bold text-primary">
+                                      ₹{item.price}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
-                              {item.description && (
-                                <p className="text-sm text-muted-foreground mb-2">
-                                  {item.description}
-                                </p>
-                              )}
-                              <p className="text-lg font-semibold text-primary">
-                                ₹{item.price}
-                              </p>
                             </div>
-                          </div>
 
-                          <div className="flex items-center justify-between mt-4">
-                            {getCartItemQuantity(item.id) === 0 ? (
-                              <Button
-                                onClick={() => addToCart(item)}
-                                size="sm"
-                                className="ml-auto"
-                              >
-                                Add to Cart
-                              </Button>
-                            ) : (
-                              <div className="flex items-center gap-2 ml-auto">
-                                <Button
-                                  onClick={() => removeFromCart(item.id)}
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                                <span className="font-medium min-w-[2rem] text-center">
-                                  {getCartItemQuantity(item.id)}
-                                </span>
-                                <Button
-                                  onClick={() => addToCart(item)}
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
+                            {/* Add to Cart Section */}
+                            <div className="p-4 border-l border-border bg-muted/20">
+                              <div className="flex flex-col items-center justify-center min-w-[100px]">
+                                {getCartItemQuantity(item.id) === 0 ? (
+                                  <Button
+                                    onClick={() => addToCart(item)}
+                                    size="sm"
+                                    className="w-full font-medium"
+                                  >
+                                    Add
+                                  </Button>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      onClick={() => removeFromCart(item.id)}
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 w-8 p-0 rounded-full"
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </Button>
+                                    <span className="font-bold text-lg min-w-[2rem] text-center">
+                                      {getCartItemQuantity(item.id)}
+                                    </span>
+                                    <Button
+                                      onClick={() => addToCart(item)}
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 w-8 p-0 rounded-full"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
@@ -398,83 +411,118 @@ export default function OrderPage() {
           {/* Cart Sidebar */}
           <div className="lg:col-span-1">
             <div className="sticky top-24">
-              <Card id="cart">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <ShoppingCart className="h-5 w-5" />
+              <Card id="cart" className="shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                      <ShoppingCart className="h-4 w-4 text-primary" />
+                    </div>
                     Your Order
+                    {cart.length > 0 && (
+                      <Badge className="ml-auto">
+                        {getTotalItems()} item{getTotalItems() > 1 ? "s" : ""}
+                      </Badge>
+                    )}
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   {cart.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">
-                      Your cart is empty
-                    </p>
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                        <ShoppingCart className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <p className="text-muted-foreground">
+                        Your cart is empty
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Add items to get started
+                      </p>
+                    </div>
                   ) : (
                     <>
-                      <div className="space-y-4 mb-6">
+                      <div className="space-y-3 mb-6 max-h-64 overflow-y-auto">
                         {cart.map((item) => (
                           <div
                             key={item.menuItem.id}
-                            className="flex items-center justify-between"
+                            className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg"
                           >
-                            <div className="flex-1">
-                              <h4 className="font-medium text-sm">
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                item.menuItem.isVeg
+                                  ? "bg-green-500"
+                                  : "bg-red-500"
+                              }`}
+                            ></div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm truncate">
                                 {item.menuItem.name}
                               </h4>
-                              <p className="text-sm text-muted-foreground">
-                                ₹{item.menuItem.price} × {item.quantity}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                onClick={() => removeFromCart(item.menuItem.id)}
-                                size="sm"
-                                variant="outline"
-                                className="h-6 w-6 p-0"
-                              >
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="text-sm min-w-[1.5rem] text-center">
-                                {item.quantity}
-                              </span>
-                              <Button
-                                onClick={() => addToCart(item.menuItem)}
-                                size="sm"
-                                variant="outline"
-                                className="h-6 w-6 p-0"
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
+                              <div className="flex items-center justify-between mt-1">
+                                <p className="text-xs text-muted-foreground">
+                                  ₹{item.menuItem.price} each
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    onClick={() =>
+                                      removeFromCart(item.menuItem.id)
+                                    }
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 w-6 p-0 rounded-full"
+                                  >
+                                    <Minus className="h-2 w-2" />
+                                  </Button>
+                                  <span className="text-sm font-bold min-w-[1rem] text-center">
+                                    {item.quantity}
+                                  </span>
+                                  <Button
+                                    onClick={() => addToCart(item.menuItem)}
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 w-6 p-0 rounded-full"
+                                  >
+                                    <Plus className="h-2 w-2" />
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
 
-                      <div className="border-t pt-4">
-                        <div className="space-y-4 mb-4">
+                      <div className="border-t pt-4 space-y-4">
+                        <div className="bg-primary/5 p-3 rounded-lg">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold">Total Amount</span>
+                            <span className="font-bold text-xl text-primary">
+                              ₹{getTotalAmount()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
                           <div>
                             <Label
                               htmlFor="customerPhone"
-                              className="text-sm font-medium flex items-center gap-1"
+                              className="text-xs font-medium flex items-center gap-1 text-muted-foreground"
                             >
                               <Phone className="h-3 w-3" />
-                              Phone Number (Optional)
+                              Phone (Optional)
                             </Label>
                             <Input
                               id="customerPhone"
                               type="tel"
-                              placeholder="Enter phone number"
+                              placeholder="Your phone number"
                               value={customerPhone}
                               onChange={(e) => setCustomerPhone(e.target.value)}
-                              className="mt-1"
+                              className="mt-1 text-sm"
                             />
                           </div>
 
                           <div>
                             <Label
                               htmlFor="customerName"
-                              className="text-sm font-medium flex items-center gap-1"
+                              className="text-xs font-medium flex items-center gap-1 text-muted-foreground"
                             >
                               <User className="h-3 w-3" />
                               Name (Optional)
@@ -482,27 +530,20 @@ export default function OrderPage() {
                             <Input
                               id="customerName"
                               type="text"
-                              placeholder="Enter your name"
+                              placeholder="Your name"
                               value={customerName}
                               onChange={(e) => setCustomerName(e.target.value)}
-                              className="mt-1"
+                              className="mt-1 text-sm"
                             />
                           </div>
                         </div>
 
-                        <div className="flex justify-between items-center mb-4">
-                          <span className="font-semibold">Total:</span>
-                          <span className="font-bold text-lg">
-                            ₹{getTotalAmount()}
-                          </span>
-                        </div>
-
                         <Button
                           onClick={handlePayment}
-                          className="w-full"
+                          className="w-full font-semibold"
                           size="lg"
                         >
-                          Pay with UPI
+                          Pay ₹{getTotalAmount()} with UPI
                         </Button>
                       </div>
                     </>

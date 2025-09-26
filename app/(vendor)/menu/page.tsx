@@ -1,581 +1,294 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ChefHat, Edit, Plus, Eye } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 
-type MenuStatus = "loading" | "exists" | "empty" | "error";
-type BuilderItem = { name: string; description: string; price: string };
-type BuilderSection = { name: string; items: BuilderItem[] };
-type MenuData = {
+interface MenuItem {
   id: string;
   name: string;
-  categories: {
-    id: string;
-    name: string;
-    menuItems: {
-      id: string;
-      name: string;
-      description: string | null;
-      price: number;
-      isAvailable: boolean;
-    }[];
-  }[];
-};
+  description: string | null;
+  price: number;
+  isAvailable: boolean;
+  isVeg: boolean;
+}
 
-export default function MenuPage() {
+interface Category {
+  id: string;
+  name: string;
+  description: string | null;
+  menuItems: MenuItem[];
+}
+
+interface Menu {
+  id: string;
+  name: string;
+  categories: Category[];
+}
+
+export default function MenuPreviewPage() {
   const { data: session, isPending } = useSession();
-  const email = session?.user?.email as string | undefined;
-  const [status, setStatus] = useState<MenuStatus>("loading");
-  const [menuData, setMenuData] = useState<MenuData | null>(null);
-  const checkedRef = useRef<Set<string>>(new Set());
-  const groupedSections = useMemo(() => {
-    if (!menuData)
-      return [] as {
-        name: string;
-        items: MenuData["categories"][number]["menuItems"];
-      }[];
-    const map = new Map<
-      string,
-      { name: string; items: MenuData["categories"][number]["menuItems"] }
-    >();
-    for (const cat of menuData.categories) {
-      const key = cat.name.trim().toLowerCase();
-      const existing = map.get(key);
-      if (existing) {
-        existing.items = [...existing.items, ...cat.menuItems];
-      } else {
-        map.set(key, { name: cat.name, items: [...cat.menuItems] });
-      }
-    }
-    return Array.from(map.values());
-  }, [menuData]);
+  const router = useRouter();
+  const [menu, setMenu] = useState<Menu | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [storeSlug, setStoreSlug] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!email || checkedRef.current.has(email)) return;
-    let cancelled = false;
+    if (!isPending && !session) {
+      router.push("/");
+    }
+  }, [session, isPending, router]);
 
-    fetch(`/api/menu/get?email=${encodeURIComponent(email)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (data?.menu) {
-          const hasItems = data.menu.categories.some(
-            (cat: MenuData["categories"][number]) => cat.menuItems.length > 0
-          );
-          setStatus(hasItems ? "exists" : "empty");
-          setMenuData(data.menu);
+  useEffect(() => {
+    const loadMenu = async () => {
+      if (!session?.user?.email) return;
+
+      try {
+        setLoading(true);
+
+        // Load menu data
+        const menuResponse = await fetch(
+          `/api/menu/get?email=${encodeURIComponent(session.user.email)}`
+        );
+        const menuData = await menuResponse.json();
+
+        // Load store data to get slug
+        const storeResponse = await fetch(
+          `/api/onboarding?email=${encodeURIComponent(session.user.email)}`
+        );
+        const storeData = await storeResponse.json();
+
+        if (menuData.menu) {
+          setMenu(menuData.menu);
         } else {
-          setStatus("empty");
-          setMenuData(null);
+          setError("No menu found");
         }
-        checkedRef.current.add(email);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setStatus("error");
-      });
 
-    return () => {
-      cancelled = true;
+        if (storeData.store?.slug) {
+          setStoreSlug(storeData.store.slug);
+        }
+      } catch (err) {
+        setError("Failed to load menu");
+        console.error("Error loading menu:", err);
+      } finally {
+        setLoading(false);
+      }
     };
-  }, [email]);
 
-  const [form, setForm] = useState({ name: "Main Menu" });
-  const [showForm, setShowForm] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [step, setStep] = useState<"menu" | "sections">("menu");
-  const [sections, setSections] = useState<BuilderSection[]>([]);
-  const [toast, setToast] = useState<{ show: boolean; message: string }>({
-    show: false,
-    message: "",
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showValidation, setShowValidation] = useState(false);
-  const canSubmit = useMemo(() => form.name.trim().length > 1, [form]);
-
-  const createMenu = async () => {
-    if (!email || !canSubmit) return;
-    const res = await fetch("/api/menu/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name: form.name }),
-    });
-    if (res.ok) {
-      setStep("sections");
+    if (session?.user?.email) {
+      loadMenu();
     }
-  };
+  }, [session?.user?.email]);
 
-  const addSection = () => {
-    setSections((s) => [...s, { name: "", items: [] }]);
-  };
-  const updateSection = (idx: number, patch: Partial<BuilderSection>) => {
-    setSections((s) =>
-      s.map((sec, i) => (i === idx ? { ...sec, ...patch } : sec))
-    );
-  };
-  const addItem = (sIdx: number) => {
-    setSections((s) =>
-      s.map((sec, i) =>
-        i === sIdx
-          ? {
-              ...sec,
-              items: [...sec.items, { name: "", description: "", price: "" }],
-            }
-          : sec
-      )
-    );
-  };
-  const removeItem = (sIdx: number, iIdx: number) => {
-    setSections((s) =>
-      s.map((sec, i) =>
-        i === sIdx
-          ? { ...sec, items: sec.items.filter((_, j) => j !== iIdx) }
-          : sec
-      )
-    );
-  };
-  const updateItem = (
-    sIdx: number,
-    iIdx: number,
-    patch: Partial<BuilderItem>
-  ) => {
-    setSections((s) =>
-      s.map((sec, i) =>
-        i === sIdx
-          ? {
-              ...sec,
-              items: sec.items.map((it, j) =>
-                j === iIdx ? { ...it, ...patch } : it
-              ),
-            }
-          : sec
-      )
+  const getTotalItems = () => {
+    if (!menu) return 0;
+    return menu.categories.reduce(
+      (total, category) => total + category.menuItems.length,
+      0
     );
   };
 
-  const canBuild = useMemo(
-    () =>
-      sections.length > 0 &&
-      sections.every(
-        (sec) =>
-          sec.name.trim() &&
-          sec.items.length > 0 &&
-          sec.items.every(
-            (it) =>
-              it.name.trim() &&
-              it.description.trim() &&
-              !!Number(it.price) &&
-              Number(it.price) > 0
-          )
-      ),
-    [sections]
-  );
-
-  // Build a lightweight local view model for instant UI updates
-  function localMenuFromSections(name: string): MenuData {
-    return {
-      id: "local",
-      name,
-      categories: sections.map((s, idx) => ({
-        id: `local-cat-${idx}`,
-        name: s.name.trim(),
-        menuItems: s.items.map((it, j) => ({
-          id: `local-item-${idx}-${j}`,
-          name: it.name.trim(),
-          description: it.description.trim() || null,
-          price: Number(it.price),
-          isAvailable: true,
-        })),
-      })),
-    };
-  }
-
-  const buildMenu = async () => {
-    if (!email || !canBuild) {
-      setShowValidation(true);
-      return;
-    }
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-
-    // Optimistic UI: close form and show immediate success, render local menu
-    setShowForm(false);
-    setIsEditing(false);
-    setStep("menu");
-    setStatus("exists");
-    setMenuData(localMenuFromSections(menuData?.name || form.name || "Menu"));
-    setToast({ show: true, message: "Menu saved successfully" });
-
-    const payload = {
-      email,
-      sections: sections.map((s) => ({
-        name: s.name.trim(),
-        items: s.items.map((it) => ({
-          name: it.name.trim(),
-          description: it.description.trim() || undefined,
-          price: Number(it.price),
-        })),
-      })),
-    };
-    const res = await fetch("/api/menu/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) {
-      // One refresh to sync server ids
-      const menuRes = await fetch(
-        `/api/menu/get?email=${encodeURIComponent(email)}`
-      );
-      const latest = await menuRes.json();
-      if (latest?.menu) setMenuData(latest.menu);
-    } else {
-      setToast({ show: true, message: "Failed to save menu" });
-    }
-    setIsSubmitting(false);
+  const getAvailableItems = () => {
+    if (!menu) return 0;
+    return menu.categories.reduce(
+      (total, category) =>
+        total + category.menuItems.filter((item) => item.isAvailable).length,
+      0
+    );
   };
 
-  useEffect(() => {
-    if (!toast.show) return;
-    const t = setTimeout(() => setToast({ show: false, message: "" }), 2500);
-    return () => clearTimeout(t);
-  }, [toast.show]);
-
-  if (isPending || status === "loading") {
+  if (isPending || loading) {
     return (
-      <div className="min-h-[60vh] bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Spinner size="lg" />
       </div>
     );
   }
 
-  return (
-    <section className="py-8">
-      <div className="container mx-auto px-6">
-        {toast.show && (
-          <div className="fixed top-4 right-4 z-50 rounded-md border bg-background px-4 py-2 text-sm shadow-md">
-            {toast.message}
-          </div>
-        )}
+  if (!session) {
+    return null;
+  }
 
-        {showForm ? (
-          step === "menu" ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Create Menu</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Menu Name</Label>
-                    <Input
-                      id="name"
-                      value={form.name}
-                      onChange={(e) => setForm({ name: e.target.value })}
-                      placeholder="Main Menu"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowForm(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button onClick={createMenu} disabled={!canSubmit}>
-                      Create Menu
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Add Sections & Items</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Sections</h4>
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={addSection}>
-                        Add Section
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setSections((s) => s.slice(0, -1))}
-                        disabled={sections.length === 0}
-                      >
-                        Remove Section
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="grid gap-4">
-                    {sections.map((section, sIdx) => (
-                      <div key={sIdx} className="border rounded-lg p-4">
-                        <div className="grid gap-2 mb-3">
-                          <Label>Section Name *</Label>
-                          <Input
-                            value={section.name}
-                            onChange={(e) =>
-                              updateSection(sIdx, { name: e.target.value })
-                            }
-                            placeholder="Starters"
-                            className={
-                              showValidation && !section.name.trim()
-                                ? "border-red-500"
-                                : ""
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between mb-2">
-                          <h5 className="font-medium">Items</h5>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => addItem(sIdx)}
-                          >
-                            Add Item
-                          </Button>
-                        </div>
-                        <div className="grid gap-3">
-                          {section.items.map((item, iIdx) => (
-                            <div
-                              key={iIdx}
-                              className="grid md:grid-cols-3 gap-3 items-end"
-                            >
-                              <div className="grid gap-1">
-                                <Label>Name *</Label>
-                                <Input
-                                  value={item.name}
-                                  onChange={(e) =>
-                                    updateItem(sIdx, iIdx, {
-                                      name: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Paneer Tikka"
-                                  className={
-                                    showValidation && !item.name.trim()
-                                      ? "border-red-500"
-                                      : ""
-                                  }
-                                />
-                              </div>
-                              <div className="grid gap-1">
-                                <Label>Description *</Label>
-                                <Input
-                                  value={item.description}
-                                  onChange={(e) =>
-                                    updateItem(sIdx, iIdx, {
-                                      description: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Required"
-                                  className={
-                                    showValidation && !item.description.trim()
-                                      ? "border-red-500"
-                                      : ""
-                                  }
-                                />
-                              </div>
-                              <div className="grid gap-1">
-                                <Label>Price (₹) *</Label>
-                                <Input
-                                  type="number"
-                                  inputMode="decimal"
-                                  value={item.price}
-                                  onChange={(e) =>
-                                    updateItem(sIdx, iIdx, {
-                                      price: e.target.value,
-                                    })
-                                  }
-                                  placeholder="199"
-                                  className={
-                                    showValidation &&
-                                    (!item.price || Number(item.price) <= 0)
-                                      ? "border-red-500"
-                                      : ""
-                                  }
-                                />
-                              </div>
-                              <div className="md:col-span-3 flex justify-end">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => removeItem(sIdx, iIdx)}
-                                >
-                                  Remove Item
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setStep("menu");
-                        setShowForm(false);
-                        setIsEditing(false);
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={
-                        isEditing
-                          ? async () => {
-                              if (!email || !canBuild) {
-                                setShowValidation(true);
-                                return;
-                              }
-                              if (isSubmitting) return;
-                              setIsSubmitting(true);
-
-                              // Optimistic UI for update
-                              setShowForm(false);
-                              setIsEditing(false);
-                              setStep("menu");
-                              setStatus("exists");
-                              setMenuData(
-                                localMenuFromSections(
-                                  menuData?.name || form.name || "Menu"
-                                )
-                              );
-                              setToast({
-                                show: true,
-                                message: "Menu updated successfully",
-                              });
-
-                              const payload = {
-                                email,
-                                sections: sections.map((s) => ({
-                                  name: s.name.trim(),
-                                  items: s.items.map((it) => ({
-                                    name: it.name.trim(),
-                                    description:
-                                      it.description.trim() || undefined,
-                                    price: Number(it.price),
-                                  })),
-                                })),
-                              };
-                              const res = await fetch("/api/menu/create", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify(payload),
-                              });
-                              if (res.ok) {
-                                const menuRes = await fetch(
-                                  `/api/menu/get?email=${encodeURIComponent(
-                                    email
-                                  )}`
-                                );
-                                const data = await menuRes.json();
-                                if (data?.menu) setMenuData(data.menu);
-                              } else {
-                                setToast({
-                                  show: true,
-                                  message: "Failed to update menu",
-                                });
-                              }
-                              setIsSubmitting(false);
-                            }
-                          : buildMenu
-                      }
-                      disabled={!canBuild}
-                    >
-                      {isEditing ? "Update Menu" : "Save Menu"}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        ) : status === "exists" && menuData ? (
-          <div className="grid gap-6">
-            <div className="flex justify-end">
+  if (error || !menu) {
+    return (
+      <main className="min-h-screen bg-background">
+        <section className="py-8">
+          <div className="container mx-auto px-6 max-w-4xl">
+            <div className="text-center py-16">
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                <ChefHat className="h-8 w-8 text-primary" />
+              </div>
+              <h1 className="text-3xl font-bold mb-4">No Menu Yet</h1>
+              <p className="text-muted-foreground text-lg mb-8">
+                You haven&apos;t created a menu yet. Start building your menu to
+                showcase your delicious offerings!
+              </p>
               <Button
-                variant="outline"
-                onClick={() => {
-                  setIsEditing(true);
-                  setShowForm(true);
-                  setStep("sections");
-                  setSections(
-                    groupedSections.map((s) => ({
-                      name: s.name,
-                      items: s.items.map((i) => ({
-                        name: i.name,
-                        description: i.description || "",
-                        price: String(i.price),
-                      })),
-                    }))
-                  );
-                }}
+                onClick={() => router.push("/menu/builder")}
+                size="lg"
+                className="px-8"
               >
-                Edit Menu
+                <Plus className="mr-2 w-4 h-4" />
+                Create Your First Menu
               </Button>
             </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
-            <div className="grid gap-8">
-              {groupedSections.map((category, idx) => (
-                <div key={`${category.name}-${idx}`}>
-                  <h2 className="text-xl font-semibold border-b pb-2 mb-4">
-                    {category.name}
-                  </h2>
-                  <div className="grid gap-3">
-                    {category.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex justify-between items-start py-2"
-                      >
-                        <div className="flex-1">
-                          <h4 className="font-medium">{item.name}</h4>
-                          {item.description && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {item.description}
-                            </p>
-                          )}
-                          {!item.isAvailable && (
-                            <span className="text-xs text-red-500 mt-1 inline-block">
-                              Unavailable
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <span className="font-semibold">₹{item.price}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+  return (
+    <main className="min-h-screen bg-background">
+      <section className="py-8">
+        <div className="container mx-auto px-6 max-w-6xl">
+          {/* Header */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">{menu.name}</h1>
+                <div className="flex items-center gap-6 text-muted-foreground">
+                  <span>{menu.categories.length} categories</span>
+                  <span>{getTotalItems()} total items</span>
+                  <span>{getAvailableItems()} available</span>
                 </div>
-              ))}
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => router.push("/menu/builder")}
+                  variant="outline"
+                  size="lg"
+                >
+                  <Edit className="mr-2 w-4 h-4" />
+                  Edit Menu
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (storeSlug) {
+                      window.open(
+                        `${window.location.origin}/menu/${storeSlug}`,
+                        "_blank"
+                      );
+                    } else {
+                      alert(
+                        "Store slug not found. Please ensure your store is properly set up."
+                      );
+                    }
+                  }}
+                  disabled={!storeSlug}
+                  size="lg"
+                >
+                  <Eye className="mr-2 w-4 h-4" />
+                  Customer View
+                </Button>
+              </div>
             </div>
           </div>
-        ) : (
-          <div className="min-h-[60vh] flex items-center justify-center">
-            <Button
-              size="lg"
-              onClick={() => {
-                setIsEditing(false);
-                setStep("sections");
-                setSections([{ name: "", items: [] }]);
-                setShowForm(true);
-              }}
-            >
-              Create Menu
-            </Button>
+
+          {/* Menu Categories */}
+          <div className="space-y-8">
+            {menu.categories.map((category) => (
+              <Card key={category.id} className="overflow-hidden">
+                <CardHeader className="bg-primary/5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-6 bg-primary rounded-full"></div>
+                    <div>
+                      <CardTitle className="text-xl">{category.name}</CardTitle>
+                      {category.description && (
+                        <p className="text-muted-foreground mt-1">
+                          {category.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6">
+                  {category.menuItems.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <ChefHat className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No items in this category yet</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {category.menuItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`p-4 rounded-lg border transition-all ${
+                            item.isAvailable
+                              ? "bg-background border-border"
+                              : "bg-muted/50 border-muted opacity-60"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-1">
+                                <div
+                                  className={`w-3 h-3 rounded-full border-2 ${
+                                    item.isVeg
+                                      ? "border-green-500 bg-green-500"
+                                      : "border-red-500 bg-red-500"
+                                  }`}
+                                ></div>
+                                <h4 className="font-semibold text-lg">
+                                  {item.name}
+                                </h4>
+                              </div>
+                              {item.description && (
+                                <p className="text-muted-foreground text-sm mb-2 ml-6">
+                                  {item.description}
+                                </p>
+                              )}
+                              <div className="ml-6 flex items-center gap-2">
+                                <span className="text-xl font-bold text-primary">
+                                  ₹{item.price}
+                                </span>
+                                {!item.isAvailable && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    Unavailable
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        )}
-      </div>
-    </section>
+
+          {menu.categories.length === 0 && (
+            <Card className="p-12 text-center">
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                <ChefHat className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">No categories yet</h3>
+              <p className="text-muted-foreground mb-6">
+                Start organizing your menu by creating categories
+              </p>
+              <Button
+                onClick={() => router.push("/menu/builder")}
+                size="lg"
+                className="px-8"
+              >
+                <Edit className="mr-2 w-4 h-4" />
+                Edit Menu
+              </Button>
+            </Card>
+          )}
+        </div>
+      </section>
+    </main>
   );
 }

@@ -125,7 +125,7 @@ export default function MenuBuilderPage() {
   }, [session, isPending, router]);
 
   const loadMenuItems = useCallback(async () => {
-    if (!session?.user?.email) return;
+    if (!session?.user?.email) return false;
 
     setIsLoading(true);
     try {
@@ -134,37 +134,52 @@ export default function MenuBuilderPage() {
       );
       const data = await response.json();
 
-      if (data.success && data.menuItems && data.menuItems.length > 0) {
-        // Convert flat menu items to sections structure
-        const mainSection: MenuSection = {
-          id: "main",
-          name: "Main Menu",
-          description: "",
-          items: data.menuItems.map(
-            (item: {
+      if (
+        data.menu &&
+        data.menu.categories &&
+        data.menu.categories.length > 0
+      ) {
+        // Convert API menu structure to builder sections format
+        const sections: MenuSection[] = data.menu.categories.map(
+          (category: {
+            id: string;
+            name: string;
+            description?: string;
+            menuItems: {
               id: string;
               name: string;
               description?: string;
               price: number;
               isVeg: boolean;
               isAvailable: boolean;
-            }) => ({
+            }[];
+          }) => ({
+            id: category.id,
+            name: category.name,
+            description: category.description || "",
+            items: category.menuItems.map((item) => ({
               id: item.id,
               name: item.name,
               description: item.description || "",
               price: item.price.toString(),
               isVeg: item.isVeg,
               isAvailable: item.isAvailable,
-            })
-          ),
-        };
+            })),
+          })
+        );
 
-        const newMenuData = { sections: [mainSection] };
+        const newMenuData = { sections };
         setMenuData(newMenuData);
         saveToCache(newMenuData);
+        console.log("Loaded existing menu with", sections.length, "sections");
+        return true; // Data was loaded
+      } else {
+        console.log("No existing menu found, starting fresh");
+        return false; // No data found
       }
     } catch (error) {
       console.error("Error loading menu items:", error);
+      return false; // Error occurred
     } finally {
       setIsLoading(false);
     }
@@ -184,9 +199,12 @@ export default function MenuBuilderPage() {
         if (!data.onboardingComplete) {
           router.push("/onboarding");
         } else {
-          // Load from cache first, then load from server
-          loadFromCache();
-          loadMenuItems();
+          // Load from server first (source of truth), fallback to cache if needed
+          const dataLoaded = await loadMenuItems();
+          // Only load from cache if no server data was found
+          if (!dataLoaded) {
+            loadFromCache();
+          }
         }
       } catch (error) {
         console.error("Error checking onboarding status:", error);
