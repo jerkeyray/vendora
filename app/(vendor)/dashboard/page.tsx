@@ -25,11 +25,13 @@ export default function Dashboard() {
   const [vendorStatus, setVendorStatus] = useState<'loading' | 'exists' | 'needs-setup' | 'error'>('loading');
   const hasCheckedRef = useRef<Set<string>>(new Set());
   const [form, setForm] = useState({
-    name: "",
-    email: "",
     phone: "",
     upiId: "",
+    storeName: "",
+    address: "",
   });
+  const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -51,7 +53,6 @@ export default function Dashboard() {
           hasCheckedRef.current.add(email);
         } else {
           setVendorStatus('needs-setup');
-          setForm((f) => ({ ...f, email: email, name: session?.user?.name || "" }));
           hasCheckedRef.current.add(email);
         }
       })
@@ -68,22 +69,28 @@ export default function Dashboard() {
 
   const canSubmit = useMemo(() => {
     return (
-      form.name.trim().length > 1 &&
-      form.email.includes("@") &&
-      form.upiId.trim().length > 3
+      form.upiId.trim().length > 3 &&
+      form.storeName.trim().length > 1
     );
   }, [form]);
 
   const submitSetup = async () => {
     if (!canSubmit || !email) return;
+    if (!email || isSubmitting) return;
+    // Optimistic confirmation + close
+    setIsSubmitting(true);
+    setVendorStatus('exists');
+    setToast({ show: true, message: 'Onboarding saved' });
+
     const res = await fetch("/api/vendor/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ email, ...form }),
     });
     if (res.ok) {
       setVendorStatus('exists');
     }
+    setIsSubmitting(false);
   };
 
   if (isPending || vendorStatus === 'loading') {
@@ -99,27 +106,30 @@ export default function Dashboard() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen bg-background overflow-hidden">
+      {toast.show && (
+        <div className="fixed top-4 right-4 z-50 rounded-md border bg-background px-4 py-2 text-sm shadow-md">
+          {toast.message}
+        </div>
+      )}
       <Dialog open={vendorStatus === 'needs-setup'} onOpenChange={() => {}} title="Complete your vendor setup">
         <div className="space-y-4">
           <div className="grid gap-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="storeName">Store Name</Label>
             <Input
-              id="name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Your full name"
+              id="storeName"
+              value={form.storeName}
+              onChange={(e) => setForm({ ...form, storeName: e.target.value })}
+              placeholder="Your store name"
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="address">Address</Label>
             <Input
-              id="email"
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="you@example.com"
-              disabled
+              id="address"
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="Store address (optional)"
             />
           </div>
           <div className="grid gap-2">
@@ -151,7 +161,7 @@ export default function Dashboard() {
       {/* Header is provided by (vendor)/layout.tsx */}
 
       {/* Dashboard Content */}
-      <section className="py-8">
+      <section className="py-6">
         <div className="container mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {/* Quick Stats */}

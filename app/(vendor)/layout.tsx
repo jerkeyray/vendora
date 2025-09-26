@@ -4,17 +4,34 @@ import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { useSession } from "@/lib/auth-client";
 import { redirect, usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
   const { data: session, isPending } = useSession();
   const pathname = usePathname();
+  const [storeName, setStoreName] = useState<string>("");
 
   useEffect(() => {
     if (!isPending && !session) {
       redirect("/");
     }
   }, [session, isPending]);
+
+  useEffect(() => {
+    async function loadStore() {
+      const email = session?.user?.email as string | undefined;
+      if (!email) return;
+      const res = await fetch(`/api/vendor/get?email=${encodeURIComponent(email)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setStoreName(data?.vendor?.store?.name || "");
+      }
+    }
+    loadStore();
+    function onVendorUpdated() { loadStore(); }
+    window.addEventListener("vendor:updated", onVendorUpdated);
+    return () => window.removeEventListener("vendor:updated", onVendorUpdated);
+  }, [session?.user?.email]);
 
   if (isPending) {
     return (
@@ -32,7 +49,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
     <main className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between relative">
-          <h1 className="text-2xl font-bold">Vendora</h1>
+          <h1 className="text-2xl font-bold">{storeName || "Vendora"}</h1>
 
           <nav className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-8">
             <Link href="/dashboard" className={`text-sm font-medium ${isActive("/dashboard") ? "text-foreground" : "text-foreground/80 hover:text-foreground"}`}>Dashboard</Link>
