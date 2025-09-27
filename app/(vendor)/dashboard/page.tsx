@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   ChefHat,
   QrCode,
@@ -30,6 +30,8 @@ export default function Dashboard() {
     todayTotal: 0,
     todayRevenue: 0,
   });
+  const [isCopied, setIsCopied] = useState(false);
+  const hasLoadedQR = useRef(false);
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -60,8 +62,9 @@ export default function Dashboard() {
 
   // Load QR code
   const loadQRCode = useCallback(async () => {
-    if (!session?.user?.email) return;
+    if (!session?.user?.email || hasLoadedQR.current) return;
 
+    hasLoadedQR.current = true;
     setIsLoadingQR(true);
     try {
       const response = await fetch(
@@ -74,6 +77,7 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error("Error loading QR code:", error);
+      hasLoadedQR.current = false; // Reset on error so we can try again
     } finally {
       setIsLoadingQR(false);
     }
@@ -83,6 +87,7 @@ export default function Dashboard() {
   const regenerateQRCode = async () => {
     if (!session?.user?.email) return;
 
+    hasLoadedQR.current = false; // Reset to allow regeneration
     setIsLoadingQR(true);
     try {
       const response = await fetch("/api/store/qr-code", {
@@ -100,6 +105,7 @@ export default function Dashboard() {
         const data = await response.json();
         setQrCode(data.qrCode);
         setStoreURL(data.storeURL);
+        hasLoadedQR.current = true; // Mark as loaded after successful regeneration
       }
     } catch (error) {
       console.error("Error regenerating QR code:", error);
@@ -120,13 +126,25 @@ export default function Dashboard() {
     document.body.removeChild(link);
   };
 
+  // Copy URL with feedback
+  const copyURL = async () => {
+    if (!storeURL) return;
+
+    try {
+      await navigator.clipboard.writeText(storeURL);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy URL:", error);
+    }
+  };
+
   // View menu
   const viewMenu = () => {
     if (storeURL) {
       window.open(storeURL, "_blank");
-    } else if (storeData?.name) {
-      // If no storeURL but we have store data, try to construct the URL
-      // This will trigger QR code generation if needed
+    } else if (storeData?.name && !isLoadingQR) {
+      // Only load QR code if we're not already loading and don't have a URL
       loadQRCode();
     }
   };
@@ -172,7 +190,7 @@ export default function Dashboard() {
 
   // Load QR code when store data is available
   useEffect(() => {
-    if (storeData && session?.user?.email) {
+    if (storeData && session?.user?.email && !hasLoadedQR.current) {
       loadQRCode();
       fetchOrderStats();
     }
@@ -306,19 +324,6 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             {/* QR Code Section */}
             <Card className="p-6">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                    <QrCode className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl">Your QR Code</CardTitle>
-                    <p className="text-muted-foreground">
-                      Share with customers to view your menu
-                    </p>
-                  </div>
-                </div>
-              </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center">
                   <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -340,20 +345,29 @@ export default function Dashboard() {
                 </div>
 
                 {storeURL ? (
-                  <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Store URL:
-                    </p>
+                  <div className="text-center p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-mono break-all flex-1">
+                      <div
+                        className={`text-sm font-mono truncate flex-1 px-2 py-1 rounded transition-colors cursor-pointer ${
+                          isCopied
+                            ? "bg-green-100 text-green-700"
+                            : "hover:bg-white/50"
+                        }`}
+                        onClick={copyURL}
+                        title={storeURL}
+                      >
                         {storeURL}
-                      </p>
+                      </div>
                       <Button
-                        onClick={() => navigator.clipboard.writeText(storeURL)}
+                        onClick={copyURL}
                         variant="outline"
                         size="sm"
-                        className="h-8 w-8 p-0"
-                        title="Copy URL"
+                        className={`h-8 w-8 p-0 transition-colors ${
+                          isCopied
+                            ? "bg-green-100 border-green-200 text-green-700"
+                            : "hover:bg-white/50"
+                        }`}
+                        title={isCopied ? "Copied!" : "Copy URL"}
                       >
                         <svg
                           className="h-4 w-4"
