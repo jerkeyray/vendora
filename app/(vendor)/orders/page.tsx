@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "@/lib/auth-client";
 import { redirect } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +65,16 @@ export default function VendorOrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [updatingOrders, setUpdatingOrders] = useState<Set<string>>(new Set());
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [realtimeStatus, setRealtimeStatus] = useState<
+    "connecting" | "connected" | "disconnected"
+  >("disconnected");
+  const [vendorStoreId, setVendorStoreId] = useState<string | null>(null);
+  const [newOrderNotification, setNewOrderNotification] = useState<
+    string | null
+  >(null);
+  const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(
+    null
+  );
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -86,6 +97,11 @@ export default function VendorOrdersPage() {
 
       const data = await response.json();
       setOrders(data.orders);
+
+      // Store vendor store ID for realtime subscription
+      if (data.vendor?.store?.id) {
+        setVendorStoreId(data.vendor.store.id);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch orders");
     } finally {
@@ -93,13 +109,195 @@ export default function VendorOrdersPage() {
     }
   }, [session?.user?.email]);
 
+  // Fetch a single new order with all relations
+  const fetchNewOrderWithRelations = useCallback(
+    async (orderId: string) => {
+      try {
+        const response = await fetch(`/api/orders/get-single?id=${orderId}`);
+        if (!response.ok) return;
+
+        const { order } = await response.json();
+
+        setOrders((prevOrders) => {
+          if (!prevOrders) return prevOrders;
+
+          // Check if order already exists (avoid duplicates)
+          const exists = prevOrders.all.find((o) => o.id === orderId);
+          if (exists) return prevOrders;
+
+          // Add new order to the beginning of all orders
+          const updatedAll = [order, ...prevOrders.all];
+
+          // Re-categorize orders
+          const pending = updatedAll.filter(
+            (order) => order.status === "PAYMENT_COMPLETED"
+          );
+          const confirmed = updatedAll.filter(
+            (order) => order.status === "CONFIRMED"
+          );
+          const completed = updatedAll.filter((order) =>
+            ["COMPLETED", "REJECTED", "CANCELLED"].includes(order.status)
+          );
+
+          return { pending, confirmed, completed, all: updatedAll };
+        });
+      } catch (err) {
+        console.error("Failed to fetch new order:", err);
+        // Fallback to full refresh if single order fetch fails
+        fetchOrders();
+      }
+    },
+    [fetchOrders]
+  );
+
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
 
+  // Set up Supabase Realtime subscription
+  useEffect(() => {
+    if (!vendorStoreId) return;
+
+    // Check if Supabase is properly configured
+    if (
+      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ) {
+      console.warn(
+        "Supabase environment variables not configured, skipping realtime setup"
+      );
+      setRealtimeStatus("disconnected");
+      return;
+    }
+
+    const setupRealtimeSubscription = async () => {
+      try {
+        setRealtimeStatus("connecting");
+
+        // Clean up existing subscription
+        if (subscriptionRef.current) {
+          await supabase.removeChannel(subscriptionRef.current);
+        }
+
+        // Create new subscription for orders table
+        subscriptionRef.current = supabase
+          .channel("orders_changes")
+          .on(
+            "postgres_changes",
+            {
+              event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+              schema: "public",
+              table: "orders",
+              filter: `storeId=eq.${vendorStoreId}`,
+            },
+            (payload) => {
+              console.log("Order change detected:", payload);
+
+              // Handle different types of changes
+              if (payload.eventType === "INSERT") {
+                // New order created
+                console.log("New order received:", payload.new);
+                const newOrder = payload.new as {
+                  id: string;
+                  orderNumber?: string;
+                };
+
+                // Show notification for new order
+                setNewOrderNotification(
+                  `New order #${newOrder.orderNumber?.slice(-6) || "received"}`
+                );
+
+                // Auto-hide notification after 5 seconds
+                setTimeout(() => {
+                  setNewOrderNotification(null);
+                }, 5000);
+
+                // Fetch the complete new order with relations instead of full refresh
+                fetchNewOrderWithRelations(newOrder.id);
+              } else if (payload.eventType === "UPDATE") {
+                // Order status updated
+                console.log("Order updated:", payload.new);
+                setOrders((prevOrders) => {
+                  if (!prevOrders) return prevOrders;
+
+                  const updatedOrder = payload.new as Order;
+                  const updatedAll = prevOrders.all.map((order) =>
+                    order.id === updatedOrder.id ? updatedOrder : order
+                  );
+
+                  // Re-categorize orders based on status
+                  const pending = updatedAll.filter(
+                    (order) => order.status === "PAYMENT_COMPLETED"
+                  );
+                  const confirmed = updatedAll.filter(
+                    (order) => order.status === "CONFIRMED"
+                  );
+                  const completed = updatedAll.filter((order) =>
+                    ["COMPLETED", "REJECTED", "CANCELLED"].includes(
+                      order.status
+                    )
+                  );
+
+                  return {
+                    pending,
+                    confirmed,
+                    completed,
+                    all: updatedAll,
+                  };
+                });
+              }
+            }
+          )
+          .subscribe((status) => {
+            console.log("Realtime subscription status:", status);
+            if (status === "SUBSCRIBED") {
+              setRealtimeStatus("connected");
+            } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+              setRealtimeStatus("disconnected");
+            }
+          });
+      } catch (error) {
+        console.error("Failed to set up realtime subscription:", error);
+        setRealtimeStatus("disconnected");
+      }
+    };
+
+    setupRealtimeSubscription();
+
+    // Cleanup function
+    return () => {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
+    };
+  }, [vendorStoreId, fetchOrders, fetchNewOrderWithRelations]);
+
   const updateOrderStatus = async (orderNumber: string, status: string) => {
     try {
       setUpdatingOrders((prev) => new Set([...prev, orderNumber]));
+
+      // Optimistically update the UI first for better UX
+      setOrders((prevOrders) => {
+        if (!prevOrders) return prevOrders;
+
+        const updatedAll = prevOrders.all.map((order) =>
+          order.orderNumber === orderNumber ? { ...order, status } : order
+        );
+
+        // Re-categorize orders
+        const pending = updatedAll.filter(
+          (order) => order.status === "PAYMENT_COMPLETED"
+        );
+        const confirmed = updatedAll.filter(
+          (order) => order.status === "CONFIRMED"
+        );
+        const completed = updatedAll.filter((order) =>
+          ["COMPLETED", "REJECTED", "CANCELLED"].includes(order.status)
+        );
+
+        return { pending, confirmed, completed, all: updatedAll };
+      });
 
       const response = await fetch("/api/orders/update-status", {
         method: "PATCH",
@@ -113,10 +311,12 @@ export default function VendorOrdersPage() {
         throw new Error("Failed to update order status");
       }
 
-      // Refresh orders after successful update
-      await fetchOrders();
+      // Realtime will handle the final update, but optimistic update provides instant feedback
     } catch (err) {
       console.error("Error updating order:", err);
+
+      // Revert optimistic update on error
+      fetchOrders();
       alert("Failed to update order. Please try again.");
     } finally {
       setUpdatingOrders((prev) => {
@@ -182,12 +382,47 @@ export default function VendorOrdersPage() {
       <div className="container mx-auto px-4 py-6 max-w-7xl">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold mb-2 text-gray-900">
-            Orders Management
-          </h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+              Orders Management
+            </h1>
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  realtimeStatus === "connected"
+                    ? "bg-green-500"
+                    : realtimeStatus === "connecting"
+                    ? "bg-yellow-500 animate-pulse"
+                    : "bg-red-500"
+                }`}
+              ></div>
+              <span className="text-sm text-gray-600">
+                {realtimeStatus === "connected"
+                  ? "Live Updates"
+                  : realtimeStatus === "connecting"
+                  ? "Connecting..."
+                  : "Offline"}
+              </span>
+            </div>
+          </div>
           <p className="text-gray-600">
             Accept or reject incoming orders and manage your order queue
+            {realtimeStatus === "connected" && (
+              <span className="text-green-600 ml-2">
+                • Real-time updates active
+              </span>
+            )}
           </p>
+
+          {/* New Order Notification */}
+          {newOrderNotification && (
+            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 animate-pulse">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
+              <span className="text-green-700 font-medium text-sm">
+                🔔 {newOrderNotification}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Stats Overview */}
@@ -237,14 +472,24 @@ export default function VendorOrdersPage() {
                 </h2>
                 <Badge
                   variant="outline"
-                  className="text-blue-600 border-blue-200 bg-blue-50"
+                  className={`text-blue-600 border-blue-200 bg-blue-50 ${
+                    (orders?.pending?.length || 0) > 0 ? "animate-pulse" : ""
+                  }`}
                 >
                   {orders?.pending.length || 0} pending
                 </Badge>
+                {(orders?.pending?.length || 0) > 0 && (
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping"></div>
+                )}
               </div>
               <p className="text-gray-600 ml-7">
                 Orders waiting for your confirmation - respond quickly to keep
                 customers happy!
+                {(orders?.pending?.length || 0) > 0 && (
+                  <span className="text-blue-600 font-medium ml-2">
+                    • New orders available
+                  </span>
+                )}
               </p>
             </div>
 
